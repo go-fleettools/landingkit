@@ -1,0 +1,45 @@
+# A TEMPLATE for a landing's .github/workflows/links.yml -- it does not run
+# here. Copy it into a landing that imports this module.
+name: links
+
+# The landing had a link to https://github.com/go-fileshare/authnd, which is a
+# 404: authnd lives in go-authn. A dead link on a landing page breaks nothing
+# that complains, so every link of the BUILT site is checked (the layouts hold
+# template expressions, not URLs).
+#
+# The checker is `landingkit links`, run at the version the landing's go.mod
+# pins: `go run` without a version inside a module that requires
+# github.com/go-fleettools/landingkit uses that requirement, so Renovate's bump
+# of the partials bumps the checker with them. It probes github.com blob links
+# on raw.githubusercontent.com, because github.com answers a program's request
+# for a blob page with 503 most of the time (see the landingkit README).
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  links:
+    name: every link and image resolves
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: "0.167.0"
+          extended: true
+      - run: hugo --minify --destination ./public
+      - name: Check
+        env:
+          GOWORK: "off"
+        run: go run github.com/go-fleettools/landingkit/cmd/landingkit links public

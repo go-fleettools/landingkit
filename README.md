@@ -20,7 +20,8 @@ Renovate proposes the bump.
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
-| `cmd/landingkit` | `brand` and `verify`, below |
+| `cmd/landingkit` | `brand`, `verify` and `links`, below |
+| `workflows/links.yml` | a template for a landing's link check, running `landingkit links` at the version the landing pins |
 | `example/` | the smallest site importing the module; CI builds it and verifies it |
 
 ## Importing it in a landing
@@ -173,6 +174,39 @@ Builds and screenshots go to a new temporary directory, or `-out`; either is
 
 CI proves both directions on every pull request: `example/` against itself
 must pass, and a copy of it with the background tinted must fail both checks.
+
+## Checking every link: `landingkit links`
+
+```
+landingkit links [-attempts 3] [-wait 3s] [-timeout 25s] public
+```
+
+Every `http(s)` URL in the **built** site must answer 2xx or 3xx, redirects
+followed. It reads the build rather than the layouts, because the layouts hold
+template expressions (`https://github.com/<org>/{{ .name }}`), not URLs.
+`img.shields.io` is skipped, since it renders anything asked of it. Each URL
+gets three tries, because a single try detects flakes rather than dead links.
+Binary files (a wasm, an image) are not scanned.
+
+⛔ **A github.com blob link is checked on the raw host.** github.com answers
+a program's request for `https://github.com/<o>/<r>/blob/<ref>/<path>` with
+**503** most of the time: 3 attempts out of 3 on every Actions run, and 7 of 8
+locally with curl's default User-Agent, while githubstatus was green. So a
+checker that asks github.com goes red on any such link. A blob link claims
+"this file exists at this ref", and
+`https://raw.githubusercontent.com/<o>/<r>/<ref>/<path>` answers exactly that:
+200 for a file, 404 for a missing one. `#anchor` and `?query` are stripped,
+and every other URL is fetched unchanged. The output names the URL that was
+probed (`(via …)`). This is the rewrite go-ndarray/docs#30 made in its own
+checker. The tests prove an existing blob path passes and a missing one fails,
+without ever asking github.com. CI also runs `links` on `example/`, which
+links to a blob page, live.
+
+`workflows/links.yml` is a template for a landing's link check. It runs
+`go run github.com/go-fleettools/landingkit/cmd/landingkit links public`
+without a version, so inside a landing that requires this module the version
+comes from the landing's `go.mod`: Renovate's bump of the partials bumps the
+checker with them.
 
 ### What it does not see
 
