@@ -1,0 +1,127 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ⛔ A WORKFLOW THAT FAILS TO PARSE REPORTS NOTHING AT ALL -- no red cross, no
+  # jobs, and `gh pr checks` answers "no checks reported on the branch", which
+  # reads exactly like a check that has not started yet. actionlint is the only
+  # thing that catches it, so it is the first lane. (Same reasoning, and the
+  # same incident, as go-fleettools/fleettools.)
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+  test:
+    name: build + vet + test
+    strategy:
+      fail-fast: false
+      matrix:
+        # The command builds paths and file:// URLs and walks up to the root
+        # looking for a .git; macOS is where kit.py was run and where /var is
+        # a symlink to /private/var.
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      # ⛔ SAY WHICH TOOLCHAIN RAN. A green check that does not record the
+      # compiler behind it makes every figure measured under it unattributable.
+      - run: go version
+      - name: gofmt
+        run: |
+          drift=$(gofmt -l .)
+          if [ -n "$drift" ]; then echo "::error::not gofmt-clean:"; echo "$drift"; exit 1; fi
+      - name: build
+        run: CGO_ENABLED=0 go build ./...
+      - name: vet
+        run: go vet ./...
+      - name: test, 100% statement coverage
+        run: |
+          go test -race -timeout 5m -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out
+          below=$(go tool cover -func=coverage.out | awk '$NF != "100.0%"')
+          if [ -n "$below" ]; then echo "::error::coverage below 100% on:"; echo "$below"; exit 1; fi
+
+  # A real Hugo site importing the module from THIS checkout (example/go.mod
+  # replaces it with ../), checked for what the partials must put in the page,
+  # then judged by `landingkit verify` with real hugo and real Chrome:
+  # against itself it must pass, and against a copy whose background is tinted
+  # (go-fft's old defect) it must FAIL. An instrument that has only ever said
+  # PASS has not shown that it can see anything.
+  hugo:
+    name: a site importing the module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Hugo resolves modules with the go command.
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: peaceiris/actions-hugo@v3
+        with:
+          hugo-version: "0.167.0"
+          extended: true
+      - uses: browser-actions/setup-chrome@48ad923757ca74d66703209fe939badbdf80f2f4 # v2.2.0
+        id: chrome
+        with:
+          chrome-version: stable
+          install-dependencies: true
+      - run: go version && hugo version && "${{ steps.chrome.outputs.chrome-path }}" --version
+      - name: build the example
+        working-directory: example
+        run: hugo --destination "$RUNNER_TEMP/example"
+      - name: the partials are in the page
+        run: |
+          page="$RUNNER_TEMP/example/index.html"
+          for want in '<meta name="darkreader-lock">' 'class="fork-ribbon"' '--cyan:#0079A8' 'id="theme-toggle"' 'aria-label="Fork me on GitHub"'; do
+            grep -qF -- "$want" "$page" || { echo "::error::$want is not in the built page"; exit 1; }
+          done
+          echo "every partial reached the page"
+      - name: go mod tidy keeps the requirement
+        working-directory: example
+        run: |
+          go mod tidy
+          grep -q 'github.com/go-fleettools/landingkit' go.mod \
+            || { echo "::error::tidy deleted the requirement: kit.go no longer anchors it"; exit 1; }
+      - run: go build -o "$RUNNER_TEMP/landingkit" ./cmd/landingkit
+      - name: verify against itself (must pass)
+        run: |
+          "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
+            -out "$RUNNER_TEMP/self" example example
+      - name: verify a tinted copy (must fail)
+        run: |
+          cp -R example "$RUNNER_TEMP/tinted"
+          mkdir -p "$RUNNER_TEMP/tinted/layouts/partials"
+          sed 's/--bg:#ffffff;/--bg:#f0fdf9;/' layouts/partials/styles.html > "$RUNNER_TEMP/tinted/layouts/partials/styles.html"
+          sed -i "s#=> ../#=> $GITHUB_WORKSPACE#" "$RUNNER_TEMP/tinted/go.mod"
+          set +e
+          "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
+            -out "$RUNNER_TEMP/tinted-out" "$RUNNER_TEMP/tinted" example | tee "$RUNNER_TEMP/tinted.log"
+          code=${PIPESTATUS[0]}
+          set -e
+          [ "$code" = 1 ] || { echo "::error::verify exited $code on a tinted background"; exit 1; }
+          grep -q 'FAIL light: 9/9 background pixels differ' "$RUNNER_TEMP/tinted.log" \
+            || { echo "::error::the pixel check did not see the tint"; exit 1; }
+          grep -q 'FAIL the <style> blocks differ' "$RUNNER_TEMP/tinted.log" \
+            || { echo "::error::the text check did not see the tint"; exit 1; }

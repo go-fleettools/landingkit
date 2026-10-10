@@ -1,0 +1,11 @@
+# The smallest landing that imports the kit: CI builds it on every pull
+# request, checks what the partials put in the page, and runs
+# `landingkit verify` on it -- against itself (must pass) and against a copy
+# with a tinted background (must fail).
+baseURL = 'https://example.invalid/'
+title   = 'landingkit example'
+disableKinds = ['taxonomy', 'term', 'rss', 'sitemap', '404']
+
+[module]
+  [[module.imports]]
+    path = "github.com/go-fleettools/landingkit"

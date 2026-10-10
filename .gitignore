@@ -1,0 +1,8 @@
+# The compiled command. Building it in the work tree is the normal thing to
+# do, and `git add -A` takes it.
+/landingkit
+/cmd/landingkit/landingkit
+# What `hugo` writes when the example is built in place.
+/example/public/
+/example/resources/
+.hugo_build.lock

@@ -1,0 +1,15 @@
+<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="go-embedded-ruby">
+  <defs>
+    <linearGradient id="ruby" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F0475A"/>
+      <stop offset="1" stop-color="#9B1C2E"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="url(#ruby)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M96 76L160 76L188 108L128 188L68 108Z"/>
+    <path d="M68 108h120"/>
+    <path d="M96 76L112 108M160 76L144 108M128 76V108"/>
+    <path d="M112 108L128 188M144 108L128 188"/>
+  </g>
+</svg>
