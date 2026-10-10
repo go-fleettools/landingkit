@@ -112,6 +112,14 @@ jobs:
       - name: let Chrome use its sandbox
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: go build -o "$RUNNER_TEMP/landingkit" ./cmd/landingkit
+      # Live, on purpose: the example links to a github.com blob page, which
+      # github.com answers with 503 when a program asks for it; `links` must
+      # go through the raw host and pass.
+      - name: every link of the example resolves
+        run: |
+          "$RUNNER_TEMP/landingkit" links "$RUNNER_TEMP/example" | tee "$RUNNER_TEMP/links.log"
+          grep -q '(via https://raw.githubusercontent.com/go-fleettools/landingkit/' "$RUNNER_TEMP/links.log" \
+            || { echo "::error::the blob link was not probed on the raw host"; exit 1; }
       - name: verify against itself (must pass)
         run: |
           "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
