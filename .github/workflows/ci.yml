@@ -104,6 +104,13 @@ jobs:
           go mod tidy
           grep -q 'github.com/go-fleettools/landingkit' go.mod \
             || { echo "::error::tidy deleted the requirement: kit.go no longer anchors it"; exit 1; }
+      # ⛔ Ubuntu 24.04 forbids unprivileged user namespaces through AppArmor,
+      # and Chrome then aborts with "No usable sandbox!" (signal 6) before it
+      # renders anything. The runner is lifted to allow them, rather than the
+      # tool learning --no-sandbox: what verify runs on a laptop is what it
+      # runs here.
+      - name: let Chrome use its sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: go build -o "$RUNNER_TEMP/landingkit" ./cmd/landingkit
       - name: verify against itself (must pass)
         run: |
