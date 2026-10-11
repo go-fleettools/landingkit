@@ -596,3 +596,25 @@ func TestProbeWithoutAPage(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+// A comment that names the table before it (go-widgets.github.io, 2026-10-11:
+// "reads its colours from [params.brand] below") must not be taken for the
+// table: the header is found at the start of a line, so the values masked are
+// the table's, not none.
+func TestBrandValuesHeaderInAComment(t *testing.T) {
+	site := t.TempDir()
+	toml := "title = \"x\"\n# The sheet reads its colours from [params.brand] below.\n[params.brand]\n  base = \"#0d9488\"\n  deep = \"#085a53\"\n\n[[params.modules]]\n  name = \"a\"\n"
+	if err := os.WriteFile(filepath.Join(site, "hugo.toml"), []byte(toml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	vals, err := brandValues(site)
+	if err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(vals, " ")
+	for _, want := range []string{"#0d9488", "#085a53"} {
+		if !strings.Contains(joined, want) {
+			t.Errorf("%q not masked: %v", want, vals)
+		}
+	}
+}

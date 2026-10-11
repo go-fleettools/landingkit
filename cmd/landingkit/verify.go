@@ -183,7 +183,9 @@ func styleBlock(html, site string) (string, error) {
 }
 
 var (
-	brandTable  = regexp.MustCompile(`(?s)\[params\.brand\](.*?)(?:\n\[|\z)`)
+	// The header at the start of a line: a comment naming the table before it
+	// must not be taken for the table (go-widgets.github.io, 2026-10-11).
+	brandTable  = regexp.MustCompile(`(?ms)^\[params\.brand\][ \t]*$(.*?)(?:\n\[|\z)`)
 	brandValue  = regexp.MustCompile(`=\s*"([^"]+)"`)
 	sheetDefaul = regexp.MustCompile(`\$br\.\w+\s*\|\s*default\s*"([^"]+)"`)
 )
