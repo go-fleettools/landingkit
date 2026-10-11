@@ -141,8 +141,9 @@ jobs:
           self=$(sed -n 's/^PASS light: \([0-9]*\)\/.*/\1/p' "$RUNNER_TEMP/self.log")
           band=$(sed -n 's/^PASS light: \([0-9]*\)\/.*/\1/p' "$RUNNER_TEMP/banded.log")
           echo "background points: $self without the band, $band with it"
-          [ -n "$self" ] && [ -n "$band" ] && [ "$band" -lt "$self" ] \
-            || { echo "::error::the band did not reduce the sampled points ($band vs $self)"; exit 1; }
+          if [ -z "$self" ] || [ -z "$band" ] || [ "$band" -ge "$self" ]; then
+            echo "::error::the band did not reduce the sampled points ($band vs $self)"; exit 1
+          fi
       - name: verify a tinted copy (must fail)
         run: |
           cp -R example "$RUNNER_TEMP/tinted"
