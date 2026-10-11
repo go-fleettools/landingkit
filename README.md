@@ -47,10 +47,10 @@ module github.com/<org>/<org>.github.io
 
 go 1.27.1
 
-require github.com/go-fleettools/landingkit v0.1.0
+require github.com/go-fleettools/landingkit v0.3.0
 ```
 
-and run `hugo mod get github.com/go-fleettools/landingkit@v0.1.0` to write
+and run `hugo mod get github.com/go-fleettools/landingkit@v0.3.0` to write
 `go.sum`. A nested Go module (go-fft's and go-ndarray's `playground/`) is not
 affected: it has its own `go.mod`, which makes it a separate module.
 
@@ -107,9 +107,20 @@ one (by WCAG relative luminance) is `bright`, the darker one is `base`.
 | `chipFg` | `deep` |
 | `chipBgDark`, `chipBorderDark` | `bright` at .14 and .32 |
 | `chipFgDark` | `bright` mixed with 45 % white |
+| `statsEnd`, `bandText` | `bright` mixed into white at 24 % and 16 %: the stats figures' gradient end and the CTA band's paragraph (v0.3.0) |
 
 The block also records both contrast ratios, so a logo whose dark stop is too
 light to carry text on white is visible in the diff that introduces it.
+
+`statsEnd` and `bandText` were the last cyan literals in the rules (`#cdf1fa`,
+`#d8f3fb`). The sheet keeps those as their defaults, so a site without
+`[params.brand]` renders the same `<style>` block as before -- checked by
+building `example/` before and after and diffing. A landing whose block was
+generated before v0.3.0 keeps the cyan for those two until it adds the two
+lines `landingkit brand` now prints. Both fractions are multiples of 4 %, so no
+channel lands on a .5 and the rounding mode cannot matter; the test checks every
+channel value against integer arithmetic, and the logos' two new lines against
+a reference computed from kit.py's `bright` without calling the Go rule.
 
 This is the Go port of the `kit.py` that lived beside the partials. Its output
 is tested **byte for byte** against kit.py's on the ten landings' logos and two
@@ -157,8 +168,9 @@ It builds both sites with Hugo and fails unless both hold:
    brand values (and the sheet's cyan defaults) are masked. Any other
    difference -- a tinted surface, an extra rule -- fails.
 2. **Pixels:** headless Chrome renders both pages, light AND dark, and the page
-   background is sampled at nine points in the gutters: every sample must equal
-   the reference's exactly. The theme is forced in both directions (headless
+   background is sampled in the gutters, at the points where nothing but the
+   page background is painted: every sample must equal the reference's
+   background exactly. The theme is forced in both directions (headless
    Chrome otherwise inherits the host's appearance, and a first version compared
    dark against dark and called it light), and the reference itself must look
    like the requested theme, or the capture is declared wrong.
@@ -168,12 +180,51 @@ had hidden go-fft's emerald backgrounds. It runs Chrome directly and decodes the
 PNG with the standard library, so the module has no dependency at all.
 `-pixels=false` runs the text check alone where there is no browser.
 
+### Which pixels are the background
+
+Up to v0.2.0 the samples were nine fixed points, `(4, 900)`, `(4, 1200)`
+and so on. A tall full-width band at one of those heights -- go-embedded-ruby's
+`.strip`, on `--bg-soft` -- then read as a different background and gave a
+FAIL that was the band, not the page, on `main` as on any branch.
+
+Now a probe (`cmd/landingkit/probe.js`) runs first, in a copy of the page
+(`landingkit-probe.html` beside `index.html`, in the render directory; the page
+itself is screenshotted unchanged). The candidates are the two gutters, x = 4
+and x = 1275, every 50 px from y = 100. The probe keeps a candidate only when
+**no element paints there**: it walks every element, not only those
+`elementsFromPoint` returns, because that list skips `pointer-events:none`
+and a transparent element on top would hide a painted one beneath. An element
+paints at a point when the point is inside its box and it has a background
+colour or image, or the point is on one of its borders, inside its box-shadow
+or outline, inside replaced content (an image, an SVG, a form control), or
+inside a `::before`/`::after` with a background. `html` and `body` ARE the
+page background and never exclude anything. Chrome prints the result with
+`--dump-dom`.
+
+Then, per theme:
+
+- fewer than 8 background points on either page is a FAIL: a page whose every
+  gutter is covered is not passed for lack of evidence;
+- the reference's points must all be one colour, or the probe let something
+  through and the check says so instead of judging;
+- every point the site kept must equal that colour.
+
+`--dump-dom`'s window keeps room for browser chrome that `--screenshot`'s does
+not (2313 px of viewport for 2400 asked, measured on Chrome 154), and a page
+laid out at another height is another page wherever it uses `vh`. The probe
+reports its viewport; the first probe learns the difference and every later
+one asks for a window that much taller, so the probe and the screenshot lay
+the page out at 1280 x 2400 both.
+
 Builds and screenshots go to a new temporary directory, or `-out`; either is
 **refused inside a git work tree**, because a `.gitignore` entry does not stop
 `git add -f` or a fresh clone from publishing a render.
 
-CI proves both directions on every pull request: `example/` against itself
-must pass, and a copy of it with the background tinted must fail both checks.
+CI proves both directions on every pull request, with real Hugo and real
+Chrome: `example/` against itself must pass; a copy of it with a tall
+full-width `.strip` band where the old points sampled must pass too (the false
+FAIL above); and a copy with the background tinted `#f0fdf9` must fail both
+checks.
 
 ## Checking every link: `landingkit links`
 
@@ -213,6 +264,42 @@ checker with them.
 Only the `<style>` block and the background. A landing whose `index.html`
 differs -- a longer headline, an extra band -- passes; that is what
 [landingdiff](https://github.com/go-fleettools/landingdiff) counts. Use both.
+
+## No partial ends with a newline
+
+A partial is pasted where it is called, and its final newline comes with it.
+`icons/github.html` had one (and `icons/book.html` did not): inside
+`<a class="btn">{{ partial "icons/github.html" . }} Source</a>` it put a
+whitespace text node between the `<svg>` and the text. That is harmless in
+`.btn`, an inline-flex with a gap (measured identical to 0.01 px), but a
+landing that replaced its own copy, which had no newline, saw its built page
+differ by a byte -- and a byte-for-byte comparison of two builds is how a
+migration to the kit is proved. So since v0.3.0 **no partial ends with a
+newline**, the block partials included, and `TestNoPartialEndsWithANewline`
+fails on one that does. An editor that adds a final newline on save will be
+caught there.
+
+## What a landing says: what a module is FOR, never a count from a copy
+
+A landing is a page written once and read for years, so anything on it that
+is **copied** from somewhere else -- a list of the organisation's modules, a
+count ("39 verbs"), a repository's description -- can only go stale. The
+fleet's drift checks keep finding exactly that: verb lists missing the latest
+verbs, "39 verbs" when there were 41, descriptions that the repository had
+since rewritten. Nothing about the landing was wrong when it was written; it
+became wrong by standing still.
+
+So a landing says **what a module is for**, in words that stay true while the
+module grows: "the `ls`, `cp` and `mount` of a filesystem you have only as an
+image", not the list of its 41 verbs. When a figure or a list matters, link to
+the place that owns it (the README, the package index, the releases page)
+rather than restating it.
+
+A possible future feature, **not built**: render the repositories'
+descriptions from the GitHub API at build time (a Hugo `resources.GetRemote`
+of `api.github.com/orgs/<org>/repos`, or a data file a workflow refreshes),
+so that the one list a landing legitimately shows comes from its source on
+every deploy instead of from a copy.
 
 ## Licence
 
