@@ -19,6 +19,7 @@ import (
 //	chipBg, chipBorder = bright mixed into white at 12 % and 30 %
 //	chipFg = deep;  chipBgDark, chipBorderDark = bright at .14 and .32
 //	chipFgDark = bright mixed with 45 % white
+//	statsEnd, bandText = bright mixed into white at 24 % and 16 % (v0.3.0)
 //
 // ⛔ The port has to round as Python rounds and must not let the compiler fuse
 // a multiply into an add. kit.py's round() is round-half-to-EVEN, so a channel
@@ -124,6 +125,9 @@ func derive(light, dark rgb) (b []entry, onWhite, onDark float64) {
 		{"chipFg", rgbHex(deep)},
 		{"chipBgDark", rgba(bright, ".14")}, {"chipBorderDark", rgba(bright, ".32")},
 		{"chipFgDark", rgbHex(mix(bright, white, 0.45))},
+		// Not from kit.py: added in v0.3.0, see the comment on statsEndT.
+		{"statsEnd", rgbHex(mix(white, bright, statsEndT))},
+		{"bandText", rgbHex(mix(white, bright, bandTextT))},
 	}
 	return b, contrast(base, white), contrast(bright, hexRGB("0b0e14"))
 }
@@ -160,3 +164,24 @@ func cmdBrand(args []string, stdout, stderr io.Writer) int {
 	fmt.Fprint(stdout, brandTOML(b, onWhite, onDark, args[0]))
 	return 0
 }
+
+// statsEndT and bandTextT are the two keys that kit.py never had: the stats
+// figures' gradient end and the CTA band's paragraph, which were cyan literals
+// in the rules (#cdf1fa, #d8f3fb) whatever the logo was. They follow chipBg's
+// rule -- bright mixed into white -- at fractions chosen near the cyan the
+// sheet keeps as its defaults (cyan gives #caf3f8 and #dcf7fa).
+//
+// Both are multiples of 4 %, on purpose. A channel is 255 - k*t for an
+// integer k, and k*t lands on an exact .5 for some k unless 100*t is a multiple
+// of 4 (chipBorder's 30 % is not, which is why the half-to-even ties exist at
+// all). At 24 and 16 no channel can be a tie, so the rounding mode cannot
+// matter: a reviewer rounding half up by hand, or a port in another language,
+// gets the same colour. brand_test.go checks every channel value against
+// integer arithmetic, in both rounding modes. (Measured while choosing: Go's
+// float rule agreed with exact half-to-even arithmetic at every whole
+// percentage from 1 to 99, so this is about the rule being easy to recompute,
+// not about a float error.)
+const (
+	statsEndT = 0.24
+	bandTextT = 0.16
+)

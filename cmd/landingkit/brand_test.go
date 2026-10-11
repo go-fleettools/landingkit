@@ -2,8 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -34,8 +37,18 @@ func TestBrandIsByteEqualToKitPy(t *testing.T) {
 		if code := run([]string{"brand", logo}, &out, &errb); code != 0 {
 			t.Fatalf("%s: exit %d: %s", logo, code, errb.String())
 		}
-		if out.String() != string(want) {
-			t.Errorf("%s:\n got:\n%s\nwant (kit.py):\n%s", logo, out.String(), want)
+		// kit.py printed every key up to chipFgDark; v0.3.0 appends two lines,
+		// checked against a reference that shares no code with derive().
+		got, added, ok := strings.Cut(out.String(), "  statsEnd = ")
+		if !ok {
+			t.Fatalf("%s: no statsEnd line in\n%s", logo, out.String())
+		}
+		if got != string(want) {
+			t.Errorf("%s:\n got:\n%s\nwant (kit.py):\n%s", logo, got, want)
+		}
+		bright := goldenBright(t, want)
+		if wantAdded := fmt.Sprintf("\"%s\"\n  bandText = \"%s\"\n", exactMix(bright, 24), exactMix(bright, 16)); added != wantAdded {
+			t.Errorf("%s: the v0.3.0 keys:\n got: statsEnd = %s\nwant: statsEnd = %s", logo, added, wantAdded)
 		}
 	}
 }
@@ -117,5 +130,77 @@ func TestMain_(t *testing.T) {
 	os.Stdout = stdout
 	if got != 0 {
 		t.Fatalf("main exited %d", got)
+	}
+}
+
+var goldenBrightRE = regexp.MustCompile(`\n  bright = "#([0-9a-f]{6})"\n`)
+
+// goldenBright is the bright stop as kit.py printed it, so the reference below
+// starts from kit.py's reading of the logo and not from stops().
+func goldenBright(t *testing.T, golden []byte) [3]int64 {
+	t.Helper()
+	m := goldenBrightRE.FindSubmatch(golden)
+	if m == nil {
+		t.Fatalf("no bright in\n%s", golden)
+	}
+	var c [3]int64
+	for i := range c {
+		v, err := strconv.ParseInt(string(m[1][2*i:2*i+2]), 16, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c[i] = v
+	}
+	return c
+}
+
+// exactMix is bright mixed into white at pct %, in integer arithmetic: the
+// channel is (255*(100-pct) + b*pct) / 100, rounded half to even on the exact
+// remainder (or half up). No float64 and no call into brand.go, so it cannot
+// share a mistake with derive().
+func exactMix(bright [3]int64, pct int64, halfUp ...bool) string {
+	s := "#"
+	for _, b := range bright {
+		num := 255*(100-pct) + b*pct
+		q, r := num/100, num%100
+		if r > 50 || (r == 50 && (q%2 == 1 || len(halfUp) > 0)) {
+			q++
+		}
+		s += fmt.Sprintf("%02x", q)
+	}
+	return s
+}
+
+// For EVERY channel value, not only the logos': derive's rule agrees with
+// exact arithmetic, and at 24 % and 16 % it agrees with rounding half UP too,
+// because no channel lands on a tie. The witness: at 30 % (chipBorder's
+// fraction) ties exist, and the two rounding modes must be seen to disagree,
+// or the half-up comparison could not see a tie at all.
+func TestNewKeysMatchExactArithmetic(t *testing.T) {
+	differ := func(pct int64, halfUp bool) (bad []int) {
+		for v := range 256 {
+			c := [3]int64{int64(v), int64(v), int64(v)}
+			want := exactMix(c, pct)
+			if halfUp {
+				want = exactMix(c, pct, true)
+			}
+			if rgbHex(mix(white, rgb{float64(v), float64(v), float64(v)}, float64(pct)/100)) != want {
+				bad = append(bad, v)
+			}
+		}
+		return bad
+	}
+	if bad := differ(30, true); len(bad) == 0 {
+		t.Fatal("witness: at 30 % rounding half up never differs; the tie check is blind")
+	}
+	for _, pct := range []int64{24, 16} {
+		for _, up := range []bool{false, true} {
+			if bad := differ(pct, up); len(bad) != 0 {
+				t.Errorf("at %d %% (half up: %v), derive's rule differs on channel values %v", pct, up, bad)
+			}
+		}
+	}
+	if statsEndT != 0.24 || bandTextT != 0.16 {
+		t.Fatalf("the fractions moved to %v and %v; the README and the test above name 24 and 16", statsEndT, bandTextT)
 	}
 }

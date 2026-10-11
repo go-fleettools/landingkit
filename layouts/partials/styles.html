@@ -42,6 +42,13 @@
 {{ $chipBgD     := $br.chipBgDark     | default "rgba(34,204,226,.14)" }}
 {{ $chipBorderD := $br.chipBorderDark | default "rgba(34,204,226,.32)" }}
 {{ $chipFgD     := $br.chipFgDark     | default "#7fe4f3" }}
+{{- /* The last two cyan literals, taken out of the rules for the same reason:
+     the stats figures' gradient end and the CTA band's paragraph. The
+     defaults are the exact text that was in the rules, so a site without
+     [params.brand] still renders byte for byte what it rendered. `landingkit
+     brand` derives both from the logo, as it derives chipBg. */}}
+{{- $statsEnd := $br.statsEnd | default "#cdf1fa" }}
+{{- $bandText := $br.bandText | default "#d8f3fb" }}
 <script>
   /* Apply the saved theme before first paint to avoid a flash; "system" leaves no attribute. */
   (function(){var m=localStorage.getItem('theme');if(m&&m!=='system')document.documentElement.setAttribute('data-theme',m);})();
@@ -169,7 +176,18 @@
   h2{font-size:34px;letter-spacing:-.03em;font-weight:820;margin:8px 0 0}
   .lead{color:var(--slate);font-size:17px;margin:14px 0 0;max-width:620px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:38px}
-  .card{border:1px solid var(--line);border-radius:var(--radius);padding:24px;background:var(--surface);transition:.18s}
+  {{/* A grid item does not shrink below its min-content width by default, and
+       one long token -- a package path, a URL -- sets that width: on a 390px
+       phone a card held go-pkgx at 469px and go-ansible at 446px, and the page
+       scrolled sideways. `min-width:0` lets the track shrink; `anywhere` (not
+       `break-word`) is the value that also LOWERS min-content, so the token
+       breaks instead of overflowing the card. It is set on `.card`, not
+       `.card p`, because overflow-wrap is inherited: the title, a <pre>, a
+       <code> and a list in the card are covered too, where `.card p` left
+       go-pkgx writing a second rule for its <pre>. An ordinary word that fits
+       on its line is never broken. */}}
+  .grid>*{min-width:0}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:24px;background:var(--surface);transition:.18s;overflow-wrap:anywhere}
   .card:hover{box-shadow:0 20px 40px -24px rgba(15,17,21,.22);transform:translateY(-3px);border-color:var(--elev-border)}
   .ico{width:42px;height:42px;border-radius:12px;background:var(--chip-bg);display:grid;place-items:center;font-size:20px;margin-bottom:14px}
   .card h3{margin:0 0 6px;font-size:17px;letter-spacing:-.01em}
@@ -177,7 +195,7 @@
   /* stats — intentionally a dark panel in both themes */
   .stats{background:var(--stats-bg);color:#fff;border-radius:26px;padding:42px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center;
     box-shadow:0 40px 80px -40px rgba(15,17,21,.6)}
-  .stats .n{font-size:40px;font-weight:850;letter-spacing:-.03em;background:linear-gradient(135deg,#fff,#cdf1fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .stats .n{font-size:40px;font-weight:850;letter-spacing:-.03em;background:linear-gradient(135deg,#fff,{{ $statsEnd | safeCSS }});-webkit-background-clip:text;background-clip:text;color:transparent}
   .stats .l{color:#9aa3b2;font-size:13.5px;margin-top:4px}
   /* roadmap */
   .road{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:36px}
@@ -192,7 +210,7 @@
   .band{background:var(--grad);border-radius:26px;padding:54px;color:#fff;text-align:center;position:relative;overflow:hidden}
   .band:after{content:"";position:absolute;inset:0;background:radial-gradient(600px 240px at 80% 120%,rgba(255,255,255,.18),transparent)}
   .band h2{color:#fff;font-size:32px}
-  .band p{color:#d8f3fb;margin:12px auto 26px;max-width:520px;position:relative;z-index:1}
+  .band p{color:{{ $bandText | safeCSS }};margin:12px auto 26px;max-width:520px;position:relative;z-index:1}
   .band .btn-ghost{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.4);color:#fff;position:relative;z-index:1}
   footer{padding:40px 0;color:var(--muted-2);font-size:13.5px;border-top:1px solid var(--line)}
   footer .wrap{display:flex;flex-wrap:wrap;gap:14px;justify-content:space-between}
