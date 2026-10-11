@@ -123,7 +123,27 @@ jobs:
       - name: verify against itself (must pass)
         run: |
           "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
-            -out "$RUNNER_TEMP/self" example example
+            -out "$RUNNER_TEMP/self" example example | tee "$RUNNER_TEMP/self.log"
+      # The false FAIL v0.2.0 gave: a tall full-width band (go-embedded-ruby's
+      # .strip, on --bg-soft) at the height where fixed points used to sample.
+      # The site has it, the reference does not, the backgrounds are equal:
+      # verify must PASS, and must have sampled fewer points than on a page
+      # without the band, which shows the probe excluded it.
+      - name: verify a copy with a tall band where the old points sampled (must pass)
+        run: |
+          cp -R example "$RUNNER_TEMP/banded"
+          sed -i "s#=> ../#=> $GITHUB_WORKSPACE#" "$RUNNER_TEMP/banded/go.mod"
+          sed -i 's#  <section style="height:2400px"></section>#  <section style="height:300px"></section>\n  <div class="strip" style="height:900px"><div class="wrap"><p class="lead-line">a tall full-width band</p></div></div>\n  <section style="height:1600px"></section>#' "$RUNNER_TEMP/banded/layouts/index.html"
+          grep -q 'class="strip" style="height:900px"' "$RUNNER_TEMP/banded/layouts/index.html" \
+            || { echo "::error::the band was not inserted"; exit 1; }
+          "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
+            -out "$RUNNER_TEMP/banded-out" "$RUNNER_TEMP/banded" example | tee "$RUNNER_TEMP/banded.log"
+          self=$(sed -n 's/^PASS light: \([0-9]*\)\/.*/\1/p' "$RUNNER_TEMP/self.log")
+          band=$(sed -n 's/^PASS light: \([0-9]*\)\/.*/\1/p' "$RUNNER_TEMP/banded.log")
+          echo "background points: $self without the band, $band with it"
+          if [ -z "$self" ] || [ -z "$band" ] || [ "$band" -ge "$self" ]; then
+            echo "::error::the band did not reduce the sampled points ($band vs $self)"; exit 1
+          fi
       - name: verify a tinted copy (must fail)
         run: |
           cp -R example "$RUNNER_TEMP/tinted"
@@ -136,7 +156,7 @@ jobs:
           code=${PIPESTATUS[0]}
           set -e
           [ "$code" = 1 ] || { echo "::error::verify exited $code on a tinted background"; exit 1; }
-          grep -q 'FAIL light: 9/9 background pixels differ' "$RUNNER_TEMP/tinted.log" \
+          grep -q '^FAIL light: \([0-9]*\)/\1 background pixels differ' "$RUNNER_TEMP/tinted.log" \
             || { echo "::error::the pixel check did not see the tint"; exit 1; }
           grep -q 'FAIL the <style> blocks differ' "$RUNNER_TEMP/tinted.log" \
             || { echo "::error::the text check did not see the tint"; exit 1; }

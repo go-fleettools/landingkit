@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,7 +13,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -69,6 +72,9 @@ type verifier struct {
 	chrome string
 	out    string
 	stdout io.Writer
+	// probeExtra is how much taller than the screenshot the --dump-dom
+	// window must be for the same viewport; learnt on the first probe.
+	probeExtra int
 }
 
 func cmdVerify(args []string, stdout, stderr io.Writer) int {
@@ -260,31 +266,151 @@ func clip(s string) string {
 	return string(r[:min(len(r), 120)])
 }
 
-// neutral are points on the page background, away from cards, text and the
-// hero washes: the left gutter at several heights, and the right gutter.
-var neutral = [][2]int{
-	{4, 900}, {4, 1200}, {4, 1500}, {4, 1800}, {4, 2100}, {4, 2350},
-	{1275, 1000}, {1275, 1600}, {1275, 2200},
+// The pixel check samples the page background, and only that. Fixed points
+// once did the sampling -- (4, 900), (4, 1200) ... -- and a tall full-width
+// band at one of those heights (go-embedded-ruby's .strip, on --bg-soft) gave a
+// FAIL that was the band, not the background, on main as on the branch. Now a
+// probe (probe.js) is run in the page first and keeps, among the candidate
+// points below, the ones where no element paints: there the pixel IS the page
+// background. The candidates are the two gutters, left and right of the
+// 1120 px column, every 50 px down the screenshot.
+const (
+	shotW, shotH = 1280, 2400
+	// minPoints is how few background points a page may have and still be
+	// judged. A page whose every gutter point is covered (a full-width
+	// wrapper with its own background) is not passed for lack of evidence.
+	minPoints = 8
+)
+
+func candidates() [][2]int {
+	var pts [][2]int
+	for y := 100; y < shotH; y += 50 {
+		pts = append(pts, [2]int{4, y}, [2]int{shotW - 5, y})
+	}
+	return pts
 }
 
-func (v *verifier) shoot(name string, dark bool) (string, error) {
-	theme, scheme := "light", 1 // Blink's PreferredColorScheme: 0 = dark, 1 = light
+//go:embed probe.js
+var probeJS string
+
+// chromeArgs are the flags every Chrome run shares, so that the probe lays the
+// page out exactly as the screenshot does.
+func chromeArgs(dark bool, height int) []string {
+	scheme := 1 // Blink's PreferredColorScheme: 0 = dark, 1 = light
 	if dark {
-		theme, scheme = "dark", 0
+		scheme = 0
 	}
-	shot := filepath.Join(v.out, name+"-"+theme+".png")
 	args := []string{"--headless=new", "--disable-gpu", "--hide-scrollbars",
-		"--window-size=1280,2400", "--screenshot=" + shot,
+		fmt.Sprintf("--window-size=%d,%d", shotW, height),
 		fmt.Sprintf("--blink-settings=preferredColorScheme=%d", scheme)}
 	if dark {
 		args = append(args, "--force-dark-mode")
 	}
-	page := url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Join(v.out, name, "index.html"))}
-	args = append(args, page.String())
+	return args
+}
+
+func themeName(dark bool) string {
+	if dark {
+		return "dark"
+	}
+	return "light"
+}
+
+func fileURL(path string) string {
+	return (&url.URL{Scheme: "file", Path: filepath.ToSlash(path)}).String()
+}
+
+func (v *verifier) shoot(name string, dark bool) (string, error) {
+	theme := themeName(dark)
+	shot := filepath.Join(v.out, name+"-"+theme+".png")
+	args := append(chromeArgs(dark, shotH), "--screenshot="+shot, fileURL(filepath.Join(v.out, name, "index.html")))
 	if out, err := runCmd(v.chrome, args...); err != nil {
 		return "", fmt.Errorf("rendering %s %s: %v\n%s", name, theme, err, out)
 	}
 	return shot, nil
+}
+
+var (
+	bodyClose  = regexp.MustCompile(`(?i)</body>`)
+	probeKeep  = regexp.MustCompile(`data-landingkit-background="([^"]*)"`)
+	probeView  = regexp.MustCompile(`data-landingkit-viewport="(\d+)x(\d+)"`)
+	probePoint = regexp.MustCompile(`^(\d+),(\d+)$`)
+)
+
+// probe returns the candidate points where the page paints nothing but its
+// background, in the given theme.
+func (v *verifier) probe(name string, dark bool) ([][2]int, error) {
+	dir := filepath.Join(v.out, name)
+	html, err := os.ReadFile(filepath.Join(dir, "index.html"))
+	if err != nil {
+		return nil, err
+	}
+	cands := candidates()
+	var js strings.Builder
+	js.WriteString("<script>window.__landingkitPoints=[")
+	for i, p := range cands {
+		if i > 0 {
+			js.WriteByte(',')
+		}
+		fmt.Fprintf(&js, "[%d,%d]", p[0], p[1])
+	}
+	js.WriteString("];\n" + probeJS + "</script>")
+	page := string(html)
+	if loc := bodyClose.FindAllStringIndex(page, -1); loc != nil {
+		at := loc[len(loc)-1][0]
+		page = page[:at] + js.String() + page[at:]
+	} else {
+		page += js.String()
+	}
+	probePage := filepath.Join(dir, "landingkit-probe.html")
+	if err := os.WriteFile(probePage, []byte(page), 0o644); err != nil {
+		return nil, err
+	}
+	theme := themeName(dark)
+	// Chrome's --dump-dom window keeps room for browser chrome that a
+	// screenshot does not (2313 px of viewport for 2400 asked, measured), and
+	// a page laid out in another viewport height is another page wherever it
+	// uses vh. The probe reports its viewport; the difference is learnt once
+	// and the window grown by it.
+	for try := 0; ; try++ {
+		args := append(chromeArgs(dark, shotH+v.probeExtra), "--dump-dom", fileURL(probePage))
+		out, err := runCmd(v.chrome, args...)
+		if err != nil {
+			return nil, fmt.Errorf("probing %s %s: %v\n%s", name, theme, err, out)
+		}
+		vp := probeView.FindSubmatch(out)
+		keep := probeKeep.FindSubmatch(out)
+		if vp == nil || keep == nil {
+			return nil, fmt.Errorf("probing %s %s: the probe did not report; is JavaScript blocked on the page?", name, theme)
+		}
+		w, _ := strconv.Atoi(string(vp[1])) // the regexp admits only digits
+		h, _ := strconv.Atoi(string(vp[2]))
+		if w != shotW || h != shotH {
+			if try == 0 && w == shotW {
+				v.probeExtra += shotH - h
+				continue
+			}
+			return nil, fmt.Errorf("probing %s %s: the probe's viewport is %dx%d, the screenshot's %dx%d", name, theme, w, h, shotW, shotH)
+		}
+		valid := map[[2]int]bool{}
+		for _, c := range cands {
+			valid[c] = true
+		}
+		var pts [][2]int
+		for _, f := range strings.Fields(string(keep[1])) {
+			m := probePoint.FindStringSubmatch(f)
+			var p [2]int
+			if m != nil {
+				p[0], _ = strconv.Atoi(m[1])
+				p[1], _ = strconv.Atoi(m[2])
+			}
+			if m == nil || !valid[p] {
+				return nil, fmt.Errorf("probing %s %s: %q is not a point that was asked about", name, theme, f)
+			}
+			pts = append(pts, p)
+		}
+		return pts, nil
+	}
 }
 
 func sample(shot string, points [][2]int) ([]rgb, error) {
@@ -305,40 +431,65 @@ func sample(shot string, points [][2]int) ([]rgb, error) {
 	return res, nil
 }
 
+// background probes a page, renders it, and samples the renders at the points
+// the probe kept.
+func (v *verifier) background(name string, dark bool) ([][2]int, []rgb, error) {
+	pts, err := v.probe(name, dark)
+	if err != nil {
+		return nil, nil, err
+	}
+	shot, err := v.shoot(name, dark)
+	if err != nil {
+		return nil, nil, err
+	}
+	px, err := sample(shot, pts)
+	return pts, px, err
+}
+
 func (v *verifier) pixels() (bool, error) {
 	ok := true
 	for _, dark := range []bool{false, true} {
-		theme := map[bool]string{false: "light", true: "dark"}[dark]
-		var got [2][]rgb
-		for i, name := range []string{"site", "ref"} {
-			shot, err := v.shoot(name, dark)
-			if err != nil {
-				return false, err
-			}
-			if got[i], err = sample(shot, neutral); err != nil {
-				return false, err
-			}
+		theme := themeName(dark)
+		sitePts, site, err := v.background("site", dark)
+		if err != nil {
+			return false, err
 		}
-		site, ref := got[0], got[1]
+		refPts, ref, err := v.background("ref", dark)
+		if err != nil {
+			return false, err
+		}
+		if len(refPts) < minPoints || len(sitePts) < minPoints {
+			ok = false
+			fmt.Fprintf(v.stdout, "FAIL %s: too little page background to judge: %d points on the site, %d on the reference, want %d each\n", theme, len(sitePts), len(refPts), minPoints)
+			continue
+		}
+		// The reference's background is one colour, or the probe let
+		// something through and nothing it says can be trusted.
+		bg := ref[0]
+		if i := slices.IndexFunc(ref, func(c rgb) bool { return c != bg }); i >= 0 {
+			ok = false
+			fmt.Fprintf(v.stdout, "FAIL %s: the REFERENCE's background is not one colour: %s at (%d, %d), %s at (%d, %d)\n", theme, rgbHex(bg), refPts[0][0], refPts[0][1], rgbHex(ref[i]), refPts[i][0], refPts[i][1])
+			continue
+		}
 		// The reference must itself look like the theme asked for, or the
 		// capture is not testing what it claims to.
-		if (luminance(ref[0]) < 0.2) != dark {
+		if (luminance(bg) < 0.2) != dark {
 			ok = false
-			fmt.Fprintf(v.stdout, "FAIL %s: the REFERENCE rendered %s, not a %s page; the capture is wrong\n", theme, rgbHex(ref[0]), theme)
+			fmt.Fprintf(v.stdout, "FAIL %s: the REFERENCE rendered %s, not a %s page; the capture is wrong\n", theme, rgbHex(bg), theme)
 			continue
 		}
 		var diff []string
-		for i, p := range neutral {
-			if site[i] != ref[i] {
-				diff = append(diff, fmt.Sprintf("(%d, %d) site %s ref %s", p[0], p[1], rgbHex(site[i]), rgbHex(ref[i])))
+		for i, p := range sitePts {
+			if site[i] != bg {
+				diff = append(diff, fmt.Sprintf("(%d, %d) site %s ref %s", p[0], p[1], rgbHex(site[i]), rgbHex(bg)))
 			}
 		}
 		if len(diff) > 0 {
 			ok = false
-			fmt.Fprintf(v.stdout, "FAIL %s: %d/%d background pixels differ, e.g. %s\n", theme, len(diff), len(neutral), strings.Join(diff[:min(3, len(diff))], ", "))
+			fmt.Fprintf(v.stdout, "FAIL %s: %d/%d background pixels differ, e.g. %s\n", theme, len(diff), len(sitePts), strings.Join(diff[:min(3, len(diff))], ", "))
 			continue
 		}
-		fmt.Fprintf(v.stdout, "PASS %s: %d/%d background pixels identical (%s)\n", theme, len(neutral), len(neutral), rgbHex(site[0]))
+		fmt.Fprintf(v.stdout, "PASS %s: %d/%d background pixels identical (%s)\n", theme, len(sitePts), len(sitePts), rgbHex(bg))
 	}
 	return ok, nil
 }

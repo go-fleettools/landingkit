@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -18,12 +21,34 @@ import (
 type fake struct {
 	html     map[string]string     // site dir -> the index.html "hugo" writes
 	bg       map[string]color.RGBA // "site-light" etc. -> the colour "Chrome" paints
+	bands    map[string][]band     // "site" etc. -> full-width bands painted over bg
 	hugoErr  error
 	noIndex  bool
 	chromErr error
 	noShot   bool
 	badShot  bool
 	calls    []string
+
+	// The probe. "Chrome" answers --dump-dom by keeping the candidate points
+	// the injected script asks about that no band covers -- what probe.js
+	// does in a real browser -- unless one of these says otherwise.
+	chromeRoom int    // window height minus viewport height, as Chrome's --dump-dom has
+	leaky      string // the page whose probe does NOT exclude its bands
+	silent     bool   // the probe reports nothing
+	stray      bool   // the probe reports a point nobody asked about
+	narrow     bool   // the probe's viewport is not shotW wide
+	stuck      bool   // the probe's viewport ignores the window size
+	keepOnly   int    // >0: the probe keeps only this many points
+	shotErr    bool   // the screenshot fails, the probe does not
+	lockRef    bool   // the ref's directory turns read-only at the first Chrome run
+	locked     string // the directory lockRef made read-only, for the cleanup
+	probeHTML  map[string]string
+}
+
+// band is a full-width stripe from y0 (included) to y1 (excluded).
+type band struct {
+	y0, y1 int
+	c      color.RGBA
 }
 
 func (f *fake) run(name string, args ...string) ([]byte, error) {
@@ -57,20 +82,40 @@ func (f *fake) chrome(args []string) ([]byte, error) {
 		return []byte("chrome said no"), f.chromErr
 	}
 	var shot string
-	theme := "light"
+	theme, height, dump := "light", 0, false
 	for _, a := range args {
 		if s, ok := strings.CutPrefix(a, "--screenshot="); ok {
 			shot = s
 		}
+		if s, ok := strings.CutPrefix(a, "--window-size=1280,"); ok {
+			height, _ = strconv.Atoi(s)
+		}
 		if a == "--blink-settings=preferredColorScheme=0" {
 			theme = "dark"
+		}
+		if a == "--dump-dom" {
+			dump = true
 		}
 	}
 	page, err := url.Parse(args[len(args)-1])
 	if err != nil {
 		return nil, err
 	}
-	name := filepath.Base(filepath.Dir(filepath.FromSlash(page.Path)))
+	dir := filepath.Dir(filepath.FromSlash(page.Path))
+	name := filepath.Base(dir)
+	if f.lockRef {
+		f.lockRef = false
+		f.locked = filepath.Join(filepath.Dir(dir), "ref")
+		if err := os.Chmod(f.locked, 0o555); err != nil {
+			return nil, err
+		}
+	}
+	if dump {
+		return f.dump(filepath.FromSlash(page.Path), name, height)
+	}
+	if f.shotErr {
+		return []byte("no screenshot today"), errors.New("exit 1")
+	}
 	if f.noShot {
 		return nil, nil
 	}
@@ -82,12 +127,64 @@ func (f *fake) chrome(args []string) ([]byte, error) {
 	for i := 0; i < len(img.Pix); i += 4 {
 		img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = c.R, c.G, c.B, 255
 	}
+	for _, b := range f.bands[name] {
+		for y := b.y0; y < b.y1; y++ {
+			for x := range 1280 {
+				img.SetRGBA(x, y, b.c)
+			}
+		}
+	}
 	out, err := os.Create(shot)
 	if err != nil {
 		return nil, err
 	}
 	defer out.Close()
 	return nil, png.Encode(out, img)
+}
+
+var askedPoints = regexp.MustCompile(`window\.__landingkitPoints=\[(.*?)\];`)
+
+// dump plays probe.js: it reads the points the injected script asks about
+// and answers, on <html>, with the ones no band covers.
+func (f *fake) dump(probePage, name string, height int) ([]byte, error) {
+	b, err := os.ReadFile(probePage)
+	if err != nil {
+		return nil, err
+	}
+	if f.probeHTML == nil {
+		f.probeHTML = map[string]string{}
+	}
+	f.probeHTML[name] = string(b)
+	if f.silent {
+		return []byte("<html><body></body></html>"), nil
+	}
+	w, h := 1280, height-f.chromeRoom
+	if f.narrow {
+		w = 800
+	}
+	if f.stuck {
+		h = 2313
+	}
+	m := askedPoints.FindSubmatch(b)
+	var keep []string
+	for _, p := range strings.Split(strings.Trim(string(m[1]), "[]"), "],[") {
+		var x, y int
+		fmt.Sscanf(p, "%d,%d", &x, &y)
+		covered := false
+		for _, bd := range f.bands[name] {
+			covered = covered || (y >= bd.y0 && y < bd.y1 && name != f.leaky)
+		}
+		if !covered && y < h {
+			keep = append(keep, fmt.Sprintf("%d,%d", x, y))
+		}
+	}
+	if f.keepOnly > 0 {
+		keep = keep[:f.keepOnly]
+	}
+	if f.stray {
+		keep = append(keep, "7,7")
+	}
+	return fmt.Appendf(nil, "noise on stderr\n<html data-landingkit-viewport=\"%dx%d\" data-landingkit-background=\"%s\"><body></body></html>", w, h, strings.Join(keep, " ")), nil
 }
 
 var (
@@ -124,6 +221,7 @@ func newFake(site, ref string) *fake {
 			"site-light": paper, "ref-light": paper,
 			"site-dark": night, "ref-dark": night,
 		},
+		chromeRoom: 87, // measured: 2313 px of viewport for a 2400 px window
 	}
 }
 
@@ -146,16 +244,18 @@ func TestVerifyPasses(t *testing.T) {
 	}
 	for _, want := range []string{
 		"PASS the <style> block equals",
-		"PASS light: 9/9 background pixels identical (#ffffff)",
-		"PASS dark: 9/9 background pixels identical (#0b0e14)",
+		"PASS light: 92/92 background pixels identical (#ffffff)",
+		"PASS dark: 92/92 background pixels identical (#0b0e14)",
 		"(builds and renders in ",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("missing %q in\n%s", want, out)
 		}
 	}
-	// Two builds and four renders, the theme forced both ways.
-	if len(f.calls) != 6 {
+	// Two builds, four probes, four renders, the theme forced both ways, and
+	// ONE probe again: the first one learns that the --dump-dom window keeps
+	// 87 px for browser chrome, and every later one asks for 2487.
+	if len(f.calls) != 11 || strings.Count(strings.Join(f.calls, "\n"), "--window-size=1280,2487") != 4 {
 		t.Fatalf("%d calls: %q", len(f.calls), f.calls)
 	}
 	for _, want := range []string{"preferredColorScheme=1", "preferredColorScheme=0 --force-dark-mode"} {
@@ -172,7 +272,7 @@ func TestVerifyCatchesATintedBackground(t *testing.T) {
 	f := newFake(site, ref)
 	f.bg["site-light"] = mint
 	code, out, _ := verify(t, f, site, ref)
-	if code != 1 || !strings.Contains(out, "FAIL light: 9/9 background pixels differ, e.g. (4, 900) site #f0fdf9 ref #ffffff") ||
+	if code != 1 || !strings.Contains(out, "FAIL light: 92/92 background pixels differ, e.g. (4, 100) site #f0fdf9 ref #ffffff") ||
 		!strings.Contains(out, "PASS dark") {
 		t.Fatalf("exit %d\n%s", code, out)
 	}
@@ -383,5 +483,116 @@ func TestFindChrome(t *testing.T) {
 func TestRunCmd(t *testing.T) {
 	if _, err := runCmd("landingkit-no-such-program"); err == nil {
 		t.Fatal("ran a program that does not exist")
+	}
+}
+
+var bgSoft = color.RGBA{0xf7, 0xf8, 0xfb, 255}
+
+// The false FAIL this probe exists for: go-embedded-ruby's .strip, a tall
+// full-width band on --bg-soft, sat where the fixed points used to sample.
+// The site has the band, the reference does not, and the backgrounds are the
+// same: PASS. The witness shows the old points WOULD have read the band.
+func TestVerifyIgnoresATallBandAtTheOldSampleHeight(t *testing.T) {
+	site, ref := sites(t)
+	f := newFake(site, ref)
+	f.html[site] = "<html><body>" + sheetA + "</body></html>"
+	f.bands = map[string][]band{"site": {{850, 1350, bgSoft}}}
+	code, out, errs := verify(t, f, site, ref)
+	if code != 0 || !strings.Contains(out, "PASS light: 72/72 background pixels identical (#ffffff)") {
+		t.Fatalf("exit %d\n%s%s", code, out, errs)
+	}
+	// The probe went in before </body>, and asked about the gutters.
+	if p := f.probeHTML["site"]; !strings.Contains(p, "window.__landingkitPoints=[[4,100],[1275,100],") || !strings.HasSuffix(p, "</script></body></html>") {
+		t.Fatalf("probe page:\n%.300s", p)
+	}
+	old := [][2]int{{4, 900}, {4, 1200}, {1275, 1000}}
+	dir := regexp.MustCompile(`\(builds and renders in (.*)\)`).FindStringSubmatch(out)[1]
+	px, err := sample(filepath.Join(dir, "site-light.png"), old)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, c := range px {
+		if c != (rgb{0xf7, 0xf8, 0xfb}) {
+			t.Fatalf("witness: the old point %v reads %s, not the band", old[i], rgbHex(c))
+		}
+	}
+}
+
+// The band is excluded, the background is not: a tinted page with a band
+// still FAILS on every point outside the band.
+func TestVerifyBandDoesNotHideATint(t *testing.T) {
+	site, ref := sites(t)
+	f := newFake(site, ref)
+	f.bands = map[string][]band{"site": {{850, 1350, bgSoft}}}
+	f.bg["site-light"] = mint
+	code, out, _ := verify(t, f, site, ref)
+	if code != 1 || !strings.Contains(out, "FAIL light: 72/72 background pixels differ, e.g. (4, 100) site #f0fdf9 ref #ffffff") {
+		t.Fatalf("exit %d\n%s", code, out)
+	}
+}
+
+func TestVerifyProbeVerdicts(t *testing.T) {
+	site, ref := sites(t)
+	for _, c := range []struct {
+		name string
+		set  func(*fake)
+		says string
+	}{
+		// A page whose gutters are all covered is not passed for lack of
+		// evidence.
+		{"too little background", func(f *fake) { f.keepOnly = minPoints - 1 },
+			"FAIL light: too little page background to judge: 7 points on the site, 7 on the reference, want 8 each"},
+		// A probe that let a band through on the REFERENCE is caught by the
+		// reference not being one colour.
+		{"leaky reference", func(f *fake) {
+			f.bands = map[string][]band{"ref": {{850, 1350, bgSoft}}}
+			f.leaky = "ref"
+		}, "FAIL light: the REFERENCE's background is not one colour: #ffffff at (4, 100), #f7f8fb at (4, 850)"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFake(site, ref)
+			c.set(f)
+			code, out, _ := verify(t, f, site, ref)
+			if code != 1 || !strings.Contains(out, c.says) {
+				t.Fatalf("exit %d, want 1 and %q\n%s", code, c.says, out)
+			}
+		})
+	}
+}
+
+func TestVerifyProbeFailures(t *testing.T) {
+	site, ref := sites(t)
+	for _, c := range []struct {
+		name string
+		set  func(*fake)
+		says string
+	}{
+		{"silent", func(f *fake) { f.silent = true }, "probing site light: the probe did not report"},
+		{"stray point", func(f *fake) { f.stray = true }, `probing site light: "7,7" is not a point that was asked about`},
+		{"narrow", func(f *fake) { f.narrow = true }, "the probe's viewport is 800x2313, the screenshot's 1280x2400"},
+		{"stuck", func(f *fake) { f.stuck = true }, "the probe's viewport is 1280x2313, the screenshot's 1280x2400"},
+		{"screenshot fails", func(f *fake) { f.shotErr = true }, "rendering site light: exit 1\nno screenshot today"},
+		{"probe page cannot be written", func(f *fake) { f.lockRef = true }, "landingkit-probe.html"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFake(site, ref)
+			c.set(f)
+			code, out, errs := verify(t, f, site, ref)
+			if f.locked != "" {
+				defer os.Chmod(f.locked, 0o755)
+			}
+			if code != 1 || !strings.Contains(errs, c.says) {
+				t.Fatalf("exit %d, want 1 and %q\nstdout:\n%s\nstderr:\n%s", code, c.says, out, errs)
+			}
+		})
+	}
+}
+
+// The probe reads the built page; a page gone between the build and the
+// probe is an error, not an empty probe.
+func TestProbeWithoutAPage(t *testing.T) {
+	v := verifier{out: t.TempDir(), chrome: "fake-chrome"}
+	if _, err := v.probe("site", false); err == nil || !strings.Contains(err.Error(), "index.html") {
+		t.Fatalf("err = %v", err)
 	}
 }
