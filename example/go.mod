@@ -2,7 +2,7 @@ module github.com/go-fleettools/landingkit/example
 
 go 1.27.1
 
-require github.com/go-fleettools/landingkit v0.0.0
+require github.com/go-fleettools/landingkit v0.3.1
 
 // CI builds this site against the checkout, so a pull request is tested with
 // the partials it changes. A landing requires a tagged version instead.
