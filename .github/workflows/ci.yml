@@ -62,6 +62,34 @@ jobs:
           below=$(go tool cover -func=coverage.out | awk '$NF != "100.0%"')
           if [ -n "$below" ]; then echo "::error::coverage below 100% on:"; echo "$below"; exit 1; fi
 
+      # ⛔ EIGHT ADVISORIES WERE REACHABLE FROM THIS MODULE and nothing asked.
+      # Scanned by hand on 2026-10-18 against the go.mod of that morning
+      # (`go 1.27.1`): GO-2026-6605 through stdlib.Get, 6613 through Read, 6611
+      # and 6607 through Write, 6603 through Close, 6610 and 6617 through
+      # AddConn, 6608 through ReadMIMEHeader -- reachable, not merely present.
+      # This module fetches pages, so those are its own HTTP paths.
+      #
+      # ⛔ And the directive IS this lane's toolchain, because the setup step
+      # reads `go-version-file: go.mod`. A floor below the fix was a lane
+      # linking the vulnerable standard library, so 100% coverage was being
+      # measured on it.
+      #
+      # ⛔ NO `set -o pipefail`, deliberately: govulncheck exits non-zero over
+      # findings it has decided are not called, and zero over some it has,
+      # which is the whole reason vulngate exists. An unread scan is caught by
+      # the emptiness check and by vulngate, which believes a run only when it
+      # carried a config AND an SBOM. -go holds the scan to the toolchain that
+      # actually ran.
+      - name: govulncheck, judged by vulngate
+        run: |
+          set -eu
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          go install github.com/go-fleettools/fleettools/cmd/vulngate@v0.20.1
+          BIN="$(go env GOPATH)/bin"
+          "$BIN/govulncheck" -format json ./... > /tmp/vuln.json || true
+          test -s /tmp/vuln.json || { echo "::error::govulncheck wrote nothing at all"; exit 1; }
+          "$BIN/vulngate" -go "$(go env GOVERSION)" /tmp/vuln.json
+
   # A real Hugo site importing the module from THIS checkout (example/go.mod
   # replaces it with ../), checked for what the partials must put in the page,
   # then judged by `landingkit verify` with real hugo and real Chrome:
