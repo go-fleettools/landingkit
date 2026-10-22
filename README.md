@@ -20,6 +20,7 @@ Renovate proposes the bump.
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
+| `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
 | `cmd/landingkit` | `brand`, `verify` and `links`, below |
 | `workflows/links.yml` | a template for a landing's link check, running `landingkit links` at the version the landing pins |
 | `example/` | the smallest site importing the module; CI builds it and verifies it |
@@ -147,6 +148,54 @@ right after `</header>`. It is the "Fork me on GitHub" ribbon (github.blog,
 2008) drawn in CSS with the brand gradient instead of the original PNGs, so it
 follows the theme. It REPLACES the nav bar's GitHub button, and the hero has no
 "Browse the source" button: all three led to the same place.
+
+## The loading carousel
+
+A WebAssembly playground downloads megabytes before its editor is ready.
+`loading-carousel.html` shows, during that wait, cards of what the project
+does: a picture, one line, and a link to the documentation. It is fed by a
+list of cards and costs nothing until it shows.
+
+```go-html-template
+{{ partial "loading-carousel.html" (dict
+     "cards"    site.Data.playground_cards  // [{title, text, href, img?}]
+     "pictures" "/playground/cards/"        // a card without img: <pictures><n><ext><suffix>
+     "ext" ".jpg" "suffix" "?v=<deploy sha>"
+     "label"    "What go-slides does"        // the region's name
+     "start"    "Start the playground"       // the button that waits for a reader
+     "fade"     "pg-placeholder") }}         // the element faded away (default: the carousel)
+```
+
+The page's loader tells it two things:
+
+```js
+landingkitCarousel.downloaded();          // the large download is over
+landingkitCarousel.done(reveal, onWait);  // ready: reveal() shows the page
+```
+
+- **Shown only while the download is still going after 300 ms** (`delay`). A
+  cached module is downloaded at once, so it never flashes the carousel,
+  whatever its compile then takes. Measuring elapsed time instead flashed it
+  on a slow CI runner.
+- **WAI-ARIA APG carousel pattern:**
+  - a labelled region, the rotation button first;
+  - slides as labelled groups;
+  - dots as buttons, the current one `aria-disabled`;
+  - `aria-live` off while rotating;
+  - hover pauses, focus stops, and only the button starts it again.
+- **`prefers-reduced-motion`**: no rotation, no animation, no fade.
+- **At the end** it fades away, unless the reader is in it (hovering,
+  focused, or a click in the last 6 s): then `onWait()` is called and a
+  Start button waits.
+- **Nothing is fetched unless it shows**: the pictures are lazy, and only
+  the next card's is preloaded. `landingkitCarousel.state` exposes `shown`,
+  `downloaded`, `advanced` and `startShown` for a test.
+
+`example/carousel/` uses it with a pretend download (`?cached=1` for a
+cached one). go-slides.github.io's playground uses it, and
+`browsertest/tour.cjs` there drives it in Chrome: throttled, hovered,
+reduced motion and cached. The **go-tex** and **go-fft** playgrounds share
+the same loader and can use it the same way.
 
 ## darkreader-lock
 

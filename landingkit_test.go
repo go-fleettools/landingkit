@@ -49,7 +49,43 @@ func TestNoPartialEndsWithANewline(t *testing.T) {
 		t.Fatal(err)
 	}
 	// ⛔ A walk that found nothing would pass every assertion above.
-	if seen < 5 {
-		t.Fatalf("found %d partials, want the 5 the kit ships", seen)
+	if seen < 6 {
+		t.Fatalf("found %d partials, want the 6 the kit ships", seen)
+	}
+}
+
+// The loading carousel keeps its contract: the WAI-ARIA APG carousel
+// pattern, no rotation under reduced motion, shown only while the large
+// download is still going (a cached load never sees it), and the page's
+// API. Its behaviour is driven in Chrome by the playgrounds that use it
+// (go-slides.github.io's browsertest/tour.cjs).
+func TestLoadingCarousel(t *testing.T) {
+	b, err := os.ReadFile("layouts/partials/loading-carousel.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := string(b)
+	for _, want := range []string{
+		`role="region" aria-roledescription="carousel"`, // the region
+		`aria-roledescription="slide"`,                  // labelled slides
+		`aria-label="Stop slide rotation"`,              // the rotation button, first in the region
+		`aria-live="off"`, `"polite"`,                   // live only when stopped
+		`aria-label="Choose slide to display"`, // the dots' group
+		`aria-disabled`,                        // the current dot stays focusable
+		`prefers-reduced-motion: reduce`,       // no rotation …
+		`prefers-reduced-motion:reduce`,        // … and no animation
+		`"focusin"`, `"mouseenter"`,            // focus stops, hover pauses
+		`if(st.done||st.downloaded)return;`, // the cached-load skip
+		`window.landingkitCarousel=api`,     // the page's API
+		`downloaded:function`, `api.done=function(reveal,onWait)`,
+		`loading="lazy"`, `im.loading="eager"`, // nothing fetched unless shown; the next one preloaded
+	} {
+		if !strings.Contains(p, want) {
+			t.Errorf("loading-carousel.html lacks %q", want)
+		}
+	}
+	// The rotation button is the region's first control.
+	if strings.Index(p, `class="lk-car-rot"`) > strings.Index(p, `class="lk-car-slides"`) {
+		t.Error("the rotation button is not the first element of the region")
 	}
 }

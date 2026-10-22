@@ -1,6 +1,6 @@
 module github.com/go-fleettools/landingkit/example
 
-go 1.27.1
+go 1.27.3
 
 require github.com/go-fleettools/landingkit v0.3.1
 
