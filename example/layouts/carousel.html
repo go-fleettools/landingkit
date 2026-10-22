@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }}: loading carousel</title>
+{{ partial "styles.html" . }}
+</head>
+<body class="lm">
+<header class="nav"><div class="wrap nav-in">
+  <a class="brand" href="/">{{ .Site.Title }}</a>
+  {{ partial "theme-toggle.html" . }}
+</div></header>
+<main>
+  <section class="hero"><div class="wrap">
+    {{/* A pretend download of 3 s: the carousel shows at 300 ms, and fades
+         into the "app" when it is over (or waits with Start for a reader in
+         it). ?cached=1 pretends the download was cached: no carousel. */}}
+    <div id="loading">
+      {{ partial "loading-carousel.html" (dict "cards" site.Data.carousel_cards "pictures" "/carousel/" "ext" ".svg" "label" "What landingkit does" "start" "Show the page" "fade" "loading") }}
+      <p id="msg">Loading…</p>
+    </div>
+    <div id="app" hidden><h1 class="head">Loaded</h1></div>
+  </div></section>
+</main>
+<script>
+"use strict";
+(function(){
+  var cached=/[?&]cached=1/.test(location.search);
+  var reveal=function(){document.getElementById("loading").hidden=true;document.getElementById("app").hidden=false;};
+  setTimeout(function(){
+    landingkitCarousel.downloaded();
+    landingkitCarousel.done(reveal,function(){document.getElementById("msg").textContent="Ready.";});
+  },cached?50:3000);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+[
+  {"title": "One stylesheet", "text": "Every landing renders the reference design with its own logo and accent.", "href": "https://github.com/go-fleettools/landingkit#readme"},
+  {"title": "Brand from the logo", "text": "landingkit brand derives the accent colours from the logo's pixels.", "href": "https://github.com/go-fleettools/landingkit#how-the-brand-colours-are-derived"},
+  {"title": "Checked in pixels", "text": "landingkit verify compares a landing with the reference, text and pixels.", "href": "https://github.com/go-fleettools/landingkit#verifying-a-landing-text-and-pixels"}
+]

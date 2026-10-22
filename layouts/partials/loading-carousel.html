@@ -1,0 +1,141 @@
+{{- /*
+loading-carousel.html: a carousel of what a project does, shown while a
+page loads something large (a WebAssembly playground's module), and only
+while it is still loading after `delay` ms, so a cached load never shows it.
+See the README ("The loading carousel").
+
+  {{ partial "loading-carousel.html" (dict
+       "cards"    site.Data.playground_cards  // [{title, text, href, img?}]
+       "pictures" "/playground/cards/"        // a card without img: <pictures><n><ext><suffix>
+       "suffix"   "?v=abc" "ext" ".jpg"
+       "label"    "What go-slides does"
+       "start"    "Start the playground"
+       "fade"     "pg-placeholder") }}       // the element faded away (default: the carousel)
+
+The page's loader then calls landingkitCarousel.downloaded() when the large
+download is over, and landingkitCarousel.done(reveal, onWait) when it is
+ready: reveal() shows the page; onWait() is called instead when the reader
+is in the carousel, which then shows its Start button (that calls reveal).
+
+WAI-ARIA APG carousel pattern: a labelled region, the rotation button
+first, slides as labelled groups, dots as buttons (aria-disabled on the
+current one), aria-live off while rotating; hover pauses, focus stops (the
+button restarts); prefers-reduced-motion: no rotation, no animation.
+*/ -}}
+{{- $id := .id | default "lk-carousel" -}}
+{{- $cards := .cards -}}
+{{- $n := len $cards -}}
+{{- $pictures := .pictures | default "" -}}
+{{- $ext := .ext | default ".jpg" -}}
+{{- $suffix := .suffix | default "" -}}
+{{- $more := .more | default "Read more" -}}
+{{- $w := .width | default 320 -}}{{- $h := .height | default 180 -}}
+{{- with $cards -}}
+<style>
+.lk-car{position:relative;width:min(380px,86vw);padding:14px 16px 10px;border:1px solid var(--line);border-radius:14px;background:var(--bg-soft);color:var(--ink);text-align:left;margin-bottom:6px}
+.lk-car[hidden],.lk-car-card[hidden],.lk-car-start[hidden]{display:none}
+.lk-car-card img{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:8px;background:var(--line)}
+.lk-car-card h3{margin:10px 0 4px;font-size:16px}
+.lk-car-card p{margin:0;font-size:13.5px;line-height:1.45;color:var(--slate);min-height:3.9em}
+.lk-car-card p a{color:var(--accent);white-space:nowrap}
+.lk-car-card.enter{animation:lk-car-in .35s ease}
+@keyframes lk-car-in{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:none}}
+.lk-car-nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:8px}
+.lk-car button{appearance:none;border:0;background:none;color:var(--ink);cursor:pointer;font:inherit}
+.lk-car-nav>button{font-size:20px;width:30px;height:30px;border-radius:8px}
+.lk-car-nav>button:hover,.lk-car-rot:hover{background:var(--line)}
+.lk-car-dots{display:flex;gap:6px}
+.lk-car-dots button{width:9px;height:9px;padding:0;border-radius:50%;background:var(--line)}
+.lk-car-dots button[aria-disabled="true"]{background:var(--accent)}
+.lk-car-rot{position:absolute;top:20px;right:22px;z-index:1;width:28px;height:28px;border-radius:8px;font-size:11px;background:rgba(0,0,0,.45)!important;color:#fff!important}
+.lk-car button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lk-car-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.lk-car-fading{opacity:0!important;pointer-events:none;transition:opacity .35s ease}
+@media (prefers-reduced-motion:reduce){.lk-car-card.enter{animation:none}.lk-car-fading{transition:none}}
+</style>
+<section id="{{ $id }}" class="lk-car" role="region" aria-roledescription="carousel" aria-label="{{ $.label | default "What this project does" }}" hidden data-delay="{{ $.delay | default 300 }}" data-every="{{ $.every | default 4500 }}" data-idle="{{ $.idle | default 6000 }}" data-fade="{{ $.fade | default $id }}">
+  <button type="button" class="lk-car-rot" id="{{ $id }}-rot" aria-label="Stop slide rotation"><span aria-hidden="true">❚❚</span></button>
+  <div class="lk-car-slides" id="{{ $id }}-slides" aria-live="off" aria-atomic="false">
+    {{- range $i, $c := . }}
+    <div class="lk-car-card" role="group" aria-roledescription="slide" aria-label="{{ add $i 1 }} of {{ $n }}: {{ $c.title }}"{{ if $i }} hidden{{ end }}>
+      <a class="lk-car-pic" href="{{ $c.href }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="{{ with $c.img }}{{ . }}{{ else }}{{ printf "%s%d%s%s" $pictures (add $i 1) $ext $suffix }}{{ end }}" width="{{ $w }}" height="{{ $h }}" alt="" loading="lazy" decoding="async"></a>
+      <h3>{{ $c.title }}</h3>
+      <p>{{ $c.text }} <a href="{{ $c.href }}" target="_blank" rel="noopener">{{ $more }}<span class="lk-car-sr"> about {{ $c.title }}</span> →</a></p>
+    </div>
+    {{- end }}
+  </div>
+  <div class="lk-car-nav">
+    <button type="button" id="{{ $id }}-prev" aria-label="Previous slide">‹</button>
+    <div role="group" aria-label="Choose slide to display" class="lk-car-dots">
+      {{- range $i, $c := . }}<button type="button" aria-label="{{ $c.title }}"{{ if not $i }} aria-disabled="true"{{ end }}></button>{{ end -}}
+    </div>
+    <button type="button" id="{{ $id }}-next" aria-label="Next slide">›</button>
+  </div>
+</section>
+<button type="button" id="{{ $id }}-start" class="btn btn-primary lk-car-start" hidden>{{ $.start | default "Start" }}</button>
+<script>
+"use strict";
+(function(){
+  var box=document.getElementById({{ $id }}),start=document.getElementById({{ $id }}+"-start");
+  var st={shown:false,done:false,downloaded:false,advanced:0,startShown:false};
+  var api={state:st,downloaded:function(){st.downloaded=true;},done:function(reveal){reveal();}};
+  window.landingkitCarousel=api;
+  if(!box)return;
+  var num=function(k,d){var v=parseInt(box.getAttribute("data-"+k),10);return isNaN(v)?d:v;};
+  var DELAY=num("delay",300),EVERY=num("every",4500),IDLE=num("idle",6000);
+  var fade=document.getElementById(box.getAttribute("data-fade"))||box;
+  var slides=[].slice.call(box.querySelectorAll(".lk-car-card")),dots=[].slice.call(box.querySelectorAll(".lk-car-dots button"));
+  var live=document.getElementById({{ $id }}+"-slides"),rot=document.getElementById({{ $id }}+"-rot"),i=0,timer=0,hover=false,touched=0;
+  var reduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var stopped=reduced;
+  // the next card's picture loads while this one is read
+  function preload(n){var im=slides[(n+slides.length)%slides.length].querySelector("img");if(im)im.loading="eager";}
+  function show(n,auto){
+    slides[i].hidden=true;dots[i].removeAttribute("aria-disabled");
+    i=(n+slides.length)%slides.length;
+    slides[i].hidden=false;dots[i].setAttribute("aria-disabled","true");
+    if(!reduced){slides[i].classList.remove("enter");void slides[i].offsetWidth;slides[i].classList.add("enter");}
+    if(auto)st.advanced++;else touched=Date.now();
+    preload(i+1);
+  }
+  function setStopped(s){
+    stopped=s;
+    rot.setAttribute("aria-label",s?"Start slide rotation":"Stop slide rotation");
+    rot.firstChild.textContent=s?"▶":"❚❚";
+    live.setAttribute("aria-live",s?"polite":"off");
+  }
+  setStopped(stopped);
+  rot.addEventListener("click",function(){setStopped(!stopped);});
+  document.getElementById({{ $id }}+"-prev").addEventListener("click",function(){show(i-1);});
+  document.getElementById({{ $id }}+"-next").addEventListener("click",function(){show(i+1);});
+  dots.forEach(function(d,k){d.addEventListener("click",function(){show(k);});});
+  box.addEventListener("mouseenter",function(){hover=true;});
+  box.addEventListener("mouseleave",function(){hover=false;});
+  // focus stops the rotation; only the rotation button starts it again
+  box.addEventListener("focusin",function(e){if(e.target!==rot&&!stopped)setStopped(true);touched=Date.now();});
+  function engaged(){return hover||box.contains(document.activeElement)||Date.now()-touched<IDLE;}
+  // shown only while the large download is still going after DELAY: a
+  // cached one is over at once, whatever its compile then takes
+  var later=setTimeout(function(){
+    if(st.done||st.downloaded)return;
+    st.shown=true;box.hidden=false;preload(1);
+    timer=setInterval(function(){if(!stopped&&!hover)show(i+1,true);},EVERY);
+  },DELAY);
+  api.done=function(reveal,onWait){
+    st.done=true;clearTimeout(later);
+    if(!st.shown){reveal();return;}
+    clearInterval(timer);
+    var go=function(){fade.classList.remove("lk-car-fading");reveal();};
+    if(engaged()){
+      start.hidden=false;st.startShown=true;
+      start.addEventListener("click",go);
+      if(onWait)onWait();
+      return;
+    }
+    if(reduced){go();return;}
+    fade.classList.add("lk-car-fading");
+    setTimeout(go,360);
+  };
+})();
+</script>
+{{- end -}}

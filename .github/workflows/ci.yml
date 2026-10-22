@@ -126,6 +126,11 @@ jobs:
             grep -qF -- "$want" "$page" || { echo "::error::$want is not in the built page"; exit 1; }
           done
           echo "every partial reached the page"
+          page="$RUNNER_TEMP/example/carousel/index.html"
+          for want in 'aria-roledescription="carousel"' 'window.landingkitCarousel=api' 'src="/carousel/2.svg"' 'data-fade="loading"' 'id="lk-carousel-start"'; do
+            grep -qF -- "$want" "$page" || { echo "::error::$want is not in the carousel page"; exit 1; }
+          done
+          echo "the loading carousel reached its page"
       - name: go mod tidy keeps the requirement
         working-directory: example
         run: |
