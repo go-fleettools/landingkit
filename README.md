@@ -124,6 +124,35 @@ channel lands on a .5 and the rounding mode cannot matter; the test checks every
 channel value against integer arithmetic, and the logos' two new lines against
 a reference computed from kit.py's `bright` without calling the Go rule.
 
+### Gradient text: `--grad-text` (v0.5.1)
+
+The hero's accent line, the performance hero's accent and the stat figures
+are text painted with a gradient. `--grad` carries white text on buttons and
+bands, so it cannot be used for text that sits on the page's own background.
+In v0.5.0 the accent line was painted with `--grad` (base→deep) in dark mode
+too, and was nearly invisible: go-slides' indigo on `#0b0e14` reached
+**1.2:1**, and no organisation reached 4.5:1. `--grad-text` has a value for
+each theme, built from the brand tokens with `color-mix()`:
+
+| theme | stops |
+|:--|:--|
+| light | `base` darkened by 15 %, then `deep` |
+| dark | `chipFgDark`, then `bright` with 30 % white |
+
+A browser without `color-mix()` gets `base`→`deep` in light mode and a
+plain `chipFgDark` in dark mode.
+
+`TestGradientTextContrast` reads the sheet, resolves it for the kit's
+defaults, for every logo in `testdata/logos` and for go-slides' indigo, and
+requires every stop to reach **4.5:1** against `--bg` in light mode and in
+both dark modes (system and toggle). That is SC 1.4.3's threshold for body
+text; the accent is large text, which needs only 3:1. Today's lowest stops:
+
+- light: 4.95:1 (go-widgets' teal, whose `base` alone is 3.74:1);
+- dark: 5.66:1 (go-slides).
+
+The test fails on v0.5.0's sheet.
+
 This is the Go port of the `kit.py` that lived beside the partials. Its output
 is tested **byte for byte** against kit.py's on the ten landings' logos and two
 synthetic ones (`cmd/landingkit/testdata/logos`), and was cross-checked on 1500
