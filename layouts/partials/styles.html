@@ -60,6 +60,11 @@
     --grad:linear-gradient(135deg,{{ $base | safeCSS }},{{ $deep | safeCSS }});
     /* interactive / text accent (brightens in dark for contrast) */
     --accent:{{ $base | safeCSS }}; --accent-deep:{{ $deep | safeCSS }};
+    /* the gradient TEXT is painted with (the hero's accent line): --grad
+       carries white text on buttons and bands, this one is text itself, so
+       it has its own value per theme. Contrast is tested (cmd/landingkit
+       TestGradientTextContrast). */
+    --grad-text:linear-gradient(135deg,{{ $base | safeCSS }},{{ $deep | safeCSS }});
     /* text + surfaces (light) */
     --ink:#0f1115; --slate:#475569; --muted-2:#8893a4;
     --line:#e7e9ee; --bg:#ffffff; --bg-soft:#f7f8fb;
@@ -77,6 +82,7 @@
   @media(prefers-color-scheme:dark){
     :root:not([data-theme]){
       --accent:{{ $bright | safeCSS }}; --accent-deep:{{ $bright | safeCSS }};
+      --grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},{{ $chipFgD | safeCSS }});
       --ink:#e6edf3; --slate:#9aa4b2; --muted-2:#7d8798;
       --line:#232a36; --bg:#0b0e14; --bg-soft:#111620;
       --surface:#141a24; --surface-2:#141a24;
@@ -89,6 +95,7 @@
   }
   :root[data-theme="dark"]{
     --accent:{{ $bright | safeCSS }}; --accent-deep:{{ $bright | safeCSS }};
+    --grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},{{ $chipFgD | safeCSS }});
     --ink:#e6edf3; --slate:#9aa4b2; --muted-2:#7d8798;
     --line:#232a36; --bg:#0b0e14; --bg-soft:#111620;
     --surface:#141a24; --surface-2:#141a24;
@@ -97,6 +104,18 @@
     --chip-bg:{{ $chipBgD | safeCSS }}; --chip-border:{{ $chipBorderD | safeCSS }}; --chip-fg:{{ $chipFgD | safeCSS }};
     --ok-bg:rgba(63,185,80,.16); --ok-fg:#56d364; --win-bg:rgba(63,185,80,.08);
     --stats-bg:#141a24; --na:#5b6472;
+  }
+  /* The gradient text, where color-mix() exists (CSS Color 5; the values
+     above are the fallback). Light: base darkened by 15 %, so a brand whose
+     base is under 4.5:1 on white (go-widgets' teal, 3.7:1) still reads.
+     Dark: from chipFgDark to bright with 30 % white, never the dark-on-dark
+     base→deep that v0.5.0 painted (indigo on #0b0e14: 1.2:1). */
+  @supports (color:color-mix(in srgb,red,blue)){
+    :root{--grad-text:linear-gradient(135deg,color-mix(in srgb,{{ $base | safeCSS }} 85%,#000),{{ $deep | safeCSS }})}
+    @media(prefers-color-scheme:dark){
+      :root:not([data-theme]){--grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},color-mix(in srgb,{{ $bright | safeCSS }} 70%,#fff))}
+    }
+    :root[data-theme="dark"]{--grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},color-mix(in srgb,{{ $bright | safeCSS }} 70%,#fff))}
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -176,7 +195,7 @@
   .pill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:var(--chip-fg);
     background:var(--chip-bg);border:1px solid var(--chip-border);padding:6px 12px;border-radius:999px}
   h1.head{font-size:54px;line-height:1.04;letter-spacing:-.035em;font-weight:850;margin:0}
-  h1.head .accent{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  h1.head .accent{background:var(--grad-text);-webkit-background-clip:text;background-clip:text;color:transparent}
   .sub{font-size:18.5px;color:var(--slate);margin:18px 0 26px;max-width:540px}
   .cta{display:flex;gap:12px;flex-wrap:wrap}
   .trust{margin-top:22px;display:flex;gap:22px;flex-wrap:wrap;color:var(--slate);font-size:13px;font-weight:600}
@@ -249,7 +268,7 @@
   .phero{padding:64px 0 18px;background:
     radial-gradient(900px 360px at 80% -10%,{{ $wash | safeCSS }},transparent 60%)}
   .phero h1{font-size:46px;line-height:1.05;letter-spacing:-.035em;font-weight:850;margin:10px 0 0}
-  .phero h1 .accent{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .phero h1 .accent{background:var(--grad-text);-webkit-background-clip:text;background-clip:text;color:transparent}
   .phero .sub{font-size:18px;color:var(--slate);margin:16px 0 0;max-width:760px}
   .psec{padding:46px 0}
   .psec h2{font-size:28px;letter-spacing:-.03em;font-weight:820;margin:0}
@@ -269,7 +288,7 @@
   td.na{color:var(--na)}
   .pcards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:22px}
   .pcard{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--surface)}
-  .pcard .n{font-size:30px;font-weight:850;letter-spacing:-.03em;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .pcard .n{font-size:30px;font-weight:850;letter-spacing:-.03em;background:var(--grad-text);-webkit-background-clip:text;background-clip:text;color:transparent}
   .pcard h3{margin:6px 0 6px;font-size:16px}
   .pcard p{margin:0;color:var(--slate);font-size:14px}
   .applist{margin-top:22px;display:grid;grid-template-columns:1fr 1fr;gap:16px}
