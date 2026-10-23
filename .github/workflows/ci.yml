@@ -136,6 +136,21 @@ jobs:
             grep -qF -- "$want" "$page" || { echo "::error::the mantra chip $want is not in the page"; exit 1; }
           done
           echo "the mantra is on by default"
+      # Four chips: the code's two and two data licences, the last two on
+      # the nav's .wrap, and a second row on a phone.
+      - name: four mantra chips reach a page built with four
+        run: |
+          printf '[params.mantra]\n  items = ["LICENSE=BSD-3-Clause", "CGO_ENABLED=0", "fonts: OFL-1.1, Bitstream-Vera", "graphics: CC-BY-4.0"]\n' > "$RUNNER_TEMP/mantra-four.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-four.toml" --destination "$RUNNER_TEMP/mantra-four")
+          page="$RUNNER_TEMP/mantra-four/index.html"
+          for want in '.nav>.wrap::before{content:"fonts: OFL-1.1, Bitstream-Vera"' '.nav>.wrap::after{content:"graphics: CC-BY-4.0"' '.nav{padding-bottom:92px}'; do
+            grep -qF -- "$want" "$page" || { echo "::error::$want is not in the page"; exit 1; }
+          done
+          printf '[params.mantra]\n  items = ["a", "b", "c", "d", "e"]\n' > "$RUNNER_TEMP/mantra-five.toml"
+          if (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-five.toml" --destination "$RUNNER_TEMP/mantra-five"); then
+            echo "::error::five items built"; exit 1
+          fi
+          echo "four chips reach the page; five are refused"
       # A landing that adopts hero-carousel.html and lists no cards must not
       # change by one byte: hero-plain writes the terminal in, hero-nocards
       # goes through the partial, and both build from one layout.

@@ -286,13 +286,24 @@ on `.nav`, so they need no markup and no change to a landing's layout.
 ```toml
 [params.mantra]
   show = false                                        # an organisation for which it is not true
-  items = ["LICENSE=Apache-2.0", "CGO_ENABLED=0"]     # or other values: at most two
+  items = ["LICENSE=Apache-2.0", "CGO_ENABLED=0"]     # or other values: at most four
 ```
 
 - **On by default.** Turn it off with `show = false`, or replace the values
   with `items`.
-  - Items are checked at build time: at most two, made of
-    `A-Za-z0-9_.=:+/ -`, and up to 40 characters each.
+  - Items are checked at build time: at most four, made of
+    `A-Za-z0-9_.=:+/, -`, and up to 40 characters each.
+- **Data under another licence gets its own chip (v0.6.0).** The code chip
+  stays, and a third or fourth chip names the data and its licence:
+
+  ```toml
+  [params.mantra]
+    items = ["LICENSE=BSD-3-Clause", "CGO_ENABLED=0", "fonts: OFL-1.1, Bitstream-Vera"]
+  ```
+
+  The third and fourth chips are drawn on the nav's `.wrap`. On a screen
+  too narrow for all of them on one row, each data chip takes a row of its
+  own under the code's two.
 - **Turned off for one page** with `mantra: false` in its front matter.
 - **Always off on a `layout: playground` page**, whose stage is fixed under
   the bar.

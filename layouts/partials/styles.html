@@ -163,7 +163,7 @@
        a strip under the top bar of every page. They are CSS generated content
        on the nav bar, so a landing gets them with no change to its markup;
        the bar grows by the strip, so nothing is covered. [params.mantra]
-       sets them (at most two items: one per pseudo-element) or turns them
+       sets them (at most four items: one per pseudo-element) or turns them
        off (show = false); a page turns them off with `mantra: false` in its
        front matter, and a page on the fleet's full-viewport `playground`
        layout, whose app is fixed under a 64px bar, never shows them. */}}
@@ -174,8 +174,8 @@
   {{- if eq .Layout "playground" }}{{ $show = false }}{{ end }}
   {{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" }}
   {{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end }}
-  {{- if gt (len $items) 2 }}{{ errorf "landingkit: [params.mantra] items holds at most two entries, got %d" (len $items) }}{{ end }}
-  {{- range $items }}{{ if not (findRE `^[A-Za-z0-9_.=:+/ -]{1,40}$` .) }}{{ errorf "landingkit: [params.mantra] item %q: letters, digits and _.=:+/- only, at most 40" . }}{{ end }}{{ end }}
+  {{- if gt (len $items) 4 }}{{ errorf "landingkit: [params.mantra] items holds at most four entries, got %d" (len $items) }}{{ end }}
+  {{- range $items }}{{ if not (findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$` .) }}{{ errorf "landingkit: [params.mantra] item %q: letters, digits, spaces and _.=:+/,- only, at most 40" . }}{{ end }}{{ end }}
   {{- if and $show (gt (len $items) 0) }}
   {{- /* the column's left edge: the .wrap's padding, inside a 1120px column */}}
   {{- $left := "max(24px,calc(50% - 536px))" }}
@@ -185,6 +185,34 @@
   .nav::before{content:{{ index $items 0 | jsonify | safeCSS }};left:{{ $left | safeCSS }}}
   {{- if gt (len $items) 1 }}
   .nav::after{content:{{ index $items 1 | jsonify | safeCSS }};left:calc({{ $left | safeCSS }} + {{ len (index $items 0) }}ch + 28px)}
+  {{- end }}
+  {{- if gt (len $items) 2 }}
+  {{- /* A third and fourth chip (v0.6.0): a licence that is not the code's,
+       such as `fonts: OFL-1.1` or `graphics: CC-BY-4.0`. The nav has two
+       pseudo-elements, its .wrap two more; both are positioned against the
+       sticky .nav. On a phone they take a second row. */}}
+  {{- $w01 := add (len (index $items 0)) (len (index $items 1)) }}
+  .nav>.wrap::before,.nav>.wrap::after{position:absolute;bottom:7px;height:22px;padding:0 9px;border:1px solid var(--chip-border);border-radius:7px;
+    background:var(--chip-bg);color:var(--chip-fg);font:600 12px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;pointer-events:none}
+  .nav>.wrap::before{content:{{ index $items 2 | jsonify | safeCSS }};left:calc({{ $left | safeCSS }} + {{ $w01 }}ch + 56px)}
+  {{- if gt (len $items) 3 }}
+  .nav>.wrap::after{content:{{ index $items 3 | jsonify | safeCSS }};left:calc({{ $left | safeCSS }} + {{ add $w01 (len (index $items 2)) }}ch + 84px)}
+  {{- end }}
+  {{- /* one row while every chip fits beside the fork ribbon: 24px of
+       padding, 7.3px per character of 12px monospace (rounded up to 8),
+       28px of chrome per chip, 120px for the ribbon */}}
+  {{- $wAll := 0 }}{{ range $items }}{{ $wAll = add $wAll (len .) }}{{ end }}
+  {{- /* below that, the code's two chips keep the first row and each data
+       chip takes a row of its own: a phone has room for one */}}
+  {{- $extra := sub (len $items) 2 }}
+  @media(max-width:{{ add 144 (add (mul 8 $wAll) (mul 28 (len $items))) }}px){
+    .nav{padding-bottom:{{ add 34 (mul 29 $extra) }}px}
+    .nav::before,.nav::after{bottom:{{ add 7 (mul 29 $extra) }}px}
+    .nav>.wrap::before{left:{{ $left | safeCSS }};bottom:{{ add 7 (mul 29 (sub $extra 1)) }}px}
+    {{- if gt (len $items) 3 }}
+    .nav>.wrap::after{left:{{ $left | safeCSS }}}
+    {{- end }}
+  }
   {{- end }}
   {{- end }}
   /* hero */

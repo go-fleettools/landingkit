@@ -132,18 +132,22 @@ func TestHeroCarousel(t *testing.T) {
 
 // The mantra: on by default with the fleet's two values, off by
 // [params.mantra] show = false, by a page's `mantra: false`, and on the
-// full-viewport playground layout; at most two items, of a plain charset
-// (they become CSS strings). CI checks the chips reach the example's page
-// and that, turned off, the page is byte for byte the previous release's.
+// full-viewport playground layout; at most four items (a data licence such
+// as `fonts: OFL-1.1` beside the code's), of a plain charset (they become
+// CSS strings). CI checks the chips reach the example's page, that four
+// reach a page built with four, and that, turned off, the page is byte for
+// byte the previous release's.
 func TestMantra(t *testing.T) {
 	contract(t, "layouts/partials/styles.html", []string{
 		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
 		`isset $mt "show"`,
 		`if eq .Params.mantra false`,
 		`if eq .Layout "playground"`,
-		`errorf "landingkit: [params.mantra] items holds at most two entries`,
-		"findRE `^[A-Za-z0-9_.=:+/ -]{1,40}$`",
+		`errorf "landingkit: [params.mantra] items holds at most four entries`,
+		"findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$`",
 		`jsonify | safeCSS`,
 		`.nav{padding-bottom:34px}`,
+		`.nav>.wrap::before{content:`, `.nav>.wrap::after{content:`, // the third and fourth chips
+		`.nav{padding-bottom:{{ add 34 (mul 29 $extra) }}px}`, // a row per data chip on a phone
 	})
 }
