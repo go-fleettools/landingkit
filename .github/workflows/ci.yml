@@ -131,6 +131,41 @@ jobs:
             grep -qF -- "$want" "$page" || { echo "::error::$want is not in the carousel page"; exit 1; }
           done
           echo "the loading carousel reached its page"
+          page="$RUNNER_TEMP/example/index.html"
+          for want in '.nav::before{content:"LICENSE=BSD-3-Clause"' '.nav::after{content:"CGO_ENABLED=0"'; do
+            grep -qF -- "$want" "$page" || { echo "::error::the mantra chip $want is not in the page"; exit 1; }
+          done
+          echo "the mantra is on by default"
+      # A landing that adopts hero-carousel.html and lists no cards must not
+      # change by one byte: hero-plain writes the terminal in, hero-nocards
+      # goes through the partial, and both build from one layout.
+      - name: no cards, the hero is the terminal byte for byte
+        run: |
+          cmp "$RUNNER_TEMP/example/hero-plain/index.html" "$RUNNER_TEMP/example/hero-nocards/index.html"
+          grep -qF 'aria-roledescription="carousel"' "$RUNNER_TEMP/example/hero-cards/index.html" \
+            || { echo "::error::the page with cards has no carousel"; exit 1; }
+          echo "hero-nocards is hero-plain, byte for byte; hero-cards is a carousel"
+      # And an organisation that turns the mantra off gets the page the kit
+      # built before the mantra existed, byte for byte: the base branch's
+      # example, built with its own kit, against this one with
+      # [params.mantra] show = false. Only meaningful while the base has no
+      # mantra (the pull request that introduced it); said, not hidden, after.
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+      - name: the mantra off, the page is the pre-mantra base's byte for byte
+        if: github.event_name == 'pull_request'
+        run: |
+          if grep -q 'Params.mantra' base/layouts/partials/styles.html; then
+            echo "the base already has the mantra: nothing pre-mantra to compare with"; exit 0
+          fi
+          (cd base/example && hugo --destination "$RUNNER_TEMP/base-example")
+          printf '[params.mantra]\n  show = false\n' > "$RUNNER_TEMP/mantra-off.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-off.toml" --destination "$RUNNER_TEMP/mantra-off")
+          cmp "$RUNNER_TEMP/base-example/index.html" "$RUNNER_TEMP/mantra-off/index.html"
+          echo "show = false builds the base's index.html exactly"
       - name: go mod tidy keeps the requirement
         working-directory: example
         run: |

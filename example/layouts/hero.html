@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }}: hero</title>
+{{ partial "styles.html" . }}
+</head>
+<body class="lm">
+<header class="nav"><div class="wrap nav-in">
+  <a class="brand" href="/">{{ .Site.Title }}</a>
+  {{ partial "theme-toggle.html" . }}
+</div></header>
+<main>
+  {{/* hero-plain (the terminal written in), hero-nocards (hero-carousel.html
+       with no cards) and hero-cards share this layout; the first two must
+       build to the same bytes, which CI checks. */}}
+  <div class="hero"><div class="wrap">
+    <div><h1 class="head">One stylesheet</h1></div>
+    {{ if eq .Params.hero_mode "plain" }}{{ partial "hero-terminal.html" . }}{{ else }}{{ partial "hero-carousel.html" . }}{{ end }}
+  </div></div>
+  <section style="height:1200px"></section>
+</main>
+</body>
+</html>

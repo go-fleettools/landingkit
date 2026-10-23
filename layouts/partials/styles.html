@@ -140,6 +140,34 @@
   .fork-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
   @media(max-width:1420px){.nav .wrap{padding-right:112px}}
   @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:34px;right:-52px;font-size:11px;padding:5px 0}.nav .wrap{padding-right:84px}}
+  {{- /* The mantra: the fleet's two promises, as environment-variable chips in
+       a strip under the top bar of every page. They are CSS generated content
+       on the nav bar, so a landing gets them with no change to its markup;
+       the bar grows by the strip, so nothing is covered. [params.mantra]
+       sets them (at most two items: one per pseudo-element) or turns them
+       off (show = false); a page turns them off with `mantra: false` in its
+       front matter, and a page on the fleet's full-viewport `playground`
+       layout, whose app is fixed under a 64px bar, never shows them. */}}
+  {{- $mt := .Site.Params.mantra | default dict }}
+  {{- $show := true }}
+  {{- if isset $mt "show" }}{{ $show = $mt.show }}{{ end }}
+  {{- if eq .Params.mantra false }}{{ $show = false }}{{ end }}
+  {{- if eq .Layout "playground" }}{{ $show = false }}{{ end }}
+  {{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" }}
+  {{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end }}
+  {{- if gt (len $items) 2 }}{{ errorf "landingkit: [params.mantra] items holds at most two entries, got %d" (len $items) }}{{ end }}
+  {{- range $items }}{{ if not (findRE `^[A-Za-z0-9_.=:+/ -]{1,40}$` .) }}{{ errorf "landingkit: [params.mantra] item %q: letters, digits and _.=:+/- only, at most 40" . }}{{ end }}{{ end }}
+  {{- if and $show (gt (len $items) 0) }}
+  {{- /* the column's left edge: the .wrap's padding, inside a 1120px column */}}
+  {{- $left := "max(24px,calc(50% - 536px))" }}
+  .nav{padding-bottom:34px}
+  .nav::before,.nav::after{position:absolute;bottom:7px;height:22px;padding:0 9px;border:1px solid var(--chip-border);border-radius:7px;
+    background:var(--chip-bg);color:var(--chip-fg);font:600 12px/20px ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;pointer-events:none}
+  .nav::before{content:{{ index $items 0 | jsonify | safeCSS }};left:{{ $left | safeCSS }}}
+  {{- if gt (len $items) 1 }}
+  .nav::after{content:{{ index $items 1 | jsonify | safeCSS }};left:calc({{ $left | safeCSS }} + {{ len (index $items 0) }}ch + 28px)}
+  {{- end }}
+  {{- end }}
   /* hero */
   .hero{padding:74px 0 30px;background:
     radial-gradient(900px 380px at 78% -8%,{{ $wash | safeCSS }},transparent 60%),
