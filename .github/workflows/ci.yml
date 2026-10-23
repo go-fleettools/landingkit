@@ -151,6 +151,18 @@ jobs:
             echo "::error::five items built"; exit 1
           fi
           echo "four chips reach the page; five are refused"
+      # A landing's own mention of the licence shows only without the strip:
+      # mantra-on.html answers for both.
+      - name: the landing's own licence line, only without the strip
+        run: |
+          if grep -qF 'lk-own-licence' "$RUNNER_TEMP/example/index.html"; then
+            echo "::error::the strip is on and the page repeats the licence"; exit 1
+          fi
+          printf '[params.mantra]\n  show = false\n' > "$RUNNER_TEMP/mantra-off2.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-off2.toml" --destination "$RUNNER_TEMP/mantra-off2")
+          grep -qF 'lk-own-licence' "$RUNNER_TEMP/mantra-off2/index.html" \
+            || { echo "::error::the strip is off and the page lost its own licence line"; exit 1; }
+          echo "the licence is said once: by the strip, or by the page"
       # A landing that adopts hero-carousel.html and lists no cards must not
       # change by one byte: hero-plain writes the terminal in, hero-nocards
       # goes through the partial, and both build from one layout.

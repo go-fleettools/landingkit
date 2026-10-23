@@ -21,6 +21,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
+| `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
 | `cmd/landingkit` | `brand`, `verify` and `links`, below |
 | `workflows/links.yml` | a template for a landing's link check, running `landingkit links` at the version the landing pins |
@@ -304,6 +305,17 @@ on `.nav`, so they need no markup and no change to a landing's layout.
   The third and fourth chips are drawn on the nav's `.wrap`. On a screen
   too narrow for all of them on one row, each data chip takes a row of its
   own under the code's two.
+- **Said once.** With the strip on, a landing does not repeat the licence or
+  `CGO_ENABLED=0` in its footer or body. A mention the landing keeps for
+  pages without the strip asks the kit:
+
+  ```go-html-template
+  {{ if not (partial "mantra-on.html" .) }}BSD-3-Clause · CGO_ENABLED=0{{ end }}
+  ```
+
+  `styles.html` asks `mantra-on.html` the same question, so the two always
+  agree. No kit partial mentions either value outside the strip, and a test
+  holds that.
 - **Turned off for one page** with `mantra: false` in its front matter.
 - **Always off on a `layout: playground` page**, whose stage is fixed under
   the bar.

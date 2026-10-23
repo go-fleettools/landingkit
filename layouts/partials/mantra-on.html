@@ -1,0 +1,18 @@
+{{- /*
+mantra-on.html: whether this page shows the mantra strip, for a landing
+that also says the licence or CGO_ENABLED=0 in its own words (a footer, a
+status line). The strip already says them: a landing shows its own mention
+only when the strip is off.
+
+  {{ if not (partial "mantra-on.html" .) }}BSD-3-Clause · CGO_ENABLED=0{{ end }}
+
+styles.html asks the same question here, so the two can never disagree.
+*/ -}}
+{{- $mt := .Site.Params.mantra | default dict -}}
+{{- $show := true -}}
+{{- if isset $mt "show" }}{{ $show = $mt.show }}{{ end -}}
+{{- if eq .Params.mantra false }}{{ $show = false }}{{ end -}}
+{{- if eq .Layout "playground" }}{{ $show = false }}{{ end -}}
+{{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" -}}
+{{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end -}}
+{{- return (and $show (gt (len $items) 0)) -}}

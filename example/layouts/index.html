@@ -23,5 +23,9 @@
   </div></section>
   <section style="height:2400px"></section>
 </main>
+{{- /* a landing's own mention of the licence, shown only without the strip */}}
+{{- if not (partial "mantra-on.html" .) }}
+<footer><div class="wrap"><span id="lk-own-licence">BSD-3-Clause · CGO_ENABLED=0</span></div></footer>
+{{- end }}
 </body>
 </html>
