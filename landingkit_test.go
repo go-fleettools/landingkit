@@ -142,7 +142,7 @@ func TestNothingElseRepeatsTheMantra(t *testing.T) {
 		}
 		seen++
 		base := filepath.Base(path)
-		if base == "styles.html" || base == "mantra-on.html" {
+		if base == "styles.html" || base == "mantra-on.html" || base == "mantra-items.html" || base == "mantra.html" {
 			return nil
 		}
 		b, err := os.ReadFile(path)
@@ -167,26 +167,41 @@ func TestNothingElseRepeatsTheMantra(t *testing.T) {
 // The mantra: on by default with the fleet's two values, off by
 // [params.mantra] show = false, by a page's `mantra: false`, and on the
 // full-viewport playground layout; at most four items (a data licence such
-// as `fonts: OFL-1.1` beside the code's), of a plain charset (they become
-// CSS strings). CI checks the chips reach the example's page, that four
-// reach a page built with four, and that, turned off, the page is byte for
-// byte the previous release's.
+// as `fonts: OFL-1.1` beside the code's), of a plain charset. Since v0.7.0
+// the chips are TEXT: mantra.html renders them from theme-toggle.html, which
+// every landing calls in its nav bar, and styles.html only styles them. No
+// `content:` may carry them again: CSS generated content looked right in a
+// screenshot and was not text (wave 3 shipped 28 pages where a text check
+// found neither value). CI checks the chips are text nodes of the example's
+// page, that four are with four, and that, turned off, nothing is rendered.
 func TestMantra(t *testing.T) {
-	contract(t, "layouts/partials/mantra-on.html", []string{
+	contract(t, "layouts/partials/mantra-items.html", []string{
 		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
+		`errorf "landingkit: [params.mantra] items holds at most four entries`,
+		"findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$`",
+		`return $items`,
+	})
+	contract(t, "layouts/partials/mantra-on.html", []string{
 		`isset $mt "show"`,
 		`if eq .Params.mantra false`,
 		`if eq .Layout "playground"`,
+		`partial "mantra-items.html" .`,
 		`return (and $show (gt (len $items) 0))`,
 	})
-	contract(t, "layouts/partials/styles.html", []string{
-		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
+	contract(t, "layouts/partials/mantra.html", []string{
+		`if partial "mantra-on.html" .`,
+		`<div class="mantra" role="note"`,
+		`<code class="mantra-chip">{{ . }}</code>`, // text, escaped by Hugo
+		`range first 2 $items`, `range after 2 $items`,
+	})
+	contract(t, "layouts/partials/theme-toggle.html", []string{`{{ partial "mantra.html" . }}`})
+	s := contract(t, "layouts/partials/styles.html", []string{
 		`$show := partial "mantra-on.html" .`, // one answer, shared with the landings
-		`errorf "landingkit: [params.mantra] items holds at most four entries`,
-		"findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$`",
-		`jsonify | safeCSS`,
 		`.nav{padding-bottom:34px}`,
-		`.nav>.wrap::before{content:`, `.nav>.wrap::after{content:`, // the third and fourth chips
+		`.mantra{position:absolute;top:69px;`,
 		`.nav{padding-bottom:{{ add 34 (mul 29 $extra) }}px}`, // a row per data chip on a phone
 	})
+	if strings.Contains(s, "::before{content:") || strings.Contains(s, "::after{content:") || strings.Contains(s, "jsonify | safeCSS") {
+		t.Error("the strip is CSS generated content again: it must be text")
+	}
 }

@@ -21,6 +21,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
+| `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
 | `cmd/landingkit` | `brand`, `verify` and `links`, below |
@@ -281,8 +282,15 @@ come from the page's `hero.cards`, else from the site's:
 
 Under the top bar of every page, two chips state what the fleet's code is:
 `LICENSE=BSD-3-Clause` and `CGO_ENABLED=0`. The licence uses its SPDX
-identifier. The chips are drawn by `styles.html` as CSS generated content
-on `.nav`, so they need no markup and no change to a landing's layout.
+identifier.
+
+**Since v0.7.0 the chips are text.** `mantra.html` renders them as
+`<code class="mantra-chip">` elements. `theme-toggle.html`, which every
+landing calls inside its nav bar, calls it, so a landing needs no change.
+Up to v0.6.0 they were CSS generated content (`.nav::before{content:"…"}`).
+That looked right in a screenshot, but nothing could select, search, index
+or reliably read it, and a page check reading text found neither value. CI
+and `TestMantra` now fail if the chips stop being text nodes.
 
 ```toml
 [params.mantra]

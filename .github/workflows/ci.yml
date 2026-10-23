@@ -132,18 +132,22 @@ jobs:
           done
           echo "the loading carousel reached its page"
           page="$RUNNER_TEMP/example/index.html"
-          for want in '.nav::before{content:"LICENSE=BSD-3-Clause"' '.nav::after{content:"CGO_ENABLED=0"'; do
-            grep -qF -- "$want" "$page" || { echo "::error::the mantra chip $want is not in the page"; exit 1; }
+          # the chips are TEXT nodes (v0.7.0), never CSS generated content
+          for want in '<code class="mantra-chip">LICENSE=BSD-3-Clause</code>' '<code class="mantra-chip">CGO_ENABLED=0</code>'; do
+            grep -qF -- "$want" "$page" || { echo "::error::the mantra chip $want is not text in the page"; exit 1; }
           done
-          echo "the mantra is on by default"
-      # Four chips: the code's two and two data licences, the last two on
-      # the nav's .wrap, and a second row on a phone.
+          if grep -qF 'content:"LICENSE=' "$page"; then
+            echo "::error::the strip is CSS generated content again"; exit 1
+          fi
+          echo "the mantra is on by default, as text"
+      # Four chips: the code's two and two data licences on a second row of
+      # chips, which a phone stacks.
       - name: four mantra chips reach a page built with four
         run: |
           printf '[params.mantra]\n  items = ["LICENSE=BSD-3-Clause", "CGO_ENABLED=0", "fonts: OFL-1.1, Bitstream-Vera", "graphics: CC-BY-4.0"]\n' > "$RUNNER_TEMP/mantra-four.toml"
           (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-four.toml" --destination "$RUNNER_TEMP/mantra-four")
           page="$RUNNER_TEMP/mantra-four/index.html"
-          for want in '.nav>.wrap::before{content:"fonts: OFL-1.1, Bitstream-Vera"' '.nav>.wrap::after{content:"graphics: CC-BY-4.0"' '.nav{padding-bottom:92px}'; do
+          for want in '<code class="mantra-chip">fonts: OFL-1.1, Bitstream-Vera</code>' '<code class="mantra-chip">graphics: CC-BY-4.0</code>' '.nav{padding-bottom:92px}'; do
             grep -qF -- "$want" "$page" || { echo "::error::$want is not in the page"; exit 1; }
           done
           printf '[params.mantra]\n  items = ["a", "b", "c", "d", "e"]\n' > "$RUNNER_TEMP/mantra-five.toml"
