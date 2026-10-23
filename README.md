@@ -21,6 +21,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
+| `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
 | `cmd/landingkit` | `brand`, `verify` and `links`, below |
 | `workflows/links.yml` | a template for a landing's link check, running `landingkit links` at the version the landing pins |
 | `example/` | the smallest site importing the module; CI builds it and verifies it |
@@ -196,6 +197,83 @@ cached one). go-slides.github.io's playground uses it, and
 `browsertest/tour.cjs` there drives it in Chrome: throttled, hovered,
 reduced motion and cached. The **go-tex** and **go-fft** playgrounds share
 the same loader and can use it the same way.
+
+## The hero carousel (v0.5.0)
+
+The hero's terminal picture can become a carousel of cards: a picture, the
+terminal itself, or a short caption with a link. Adopting it changes
+nothing until cards are listed:
+
+1. move the hero's `<div class="term">…</div>` into
+   `layouts/partials/hero-terminal.html`;
+2. call `{{ partial "hero-carousel.html" . }}` where it was.
+
+With no cards the partial renders `hero-terminal.html` and nothing else.
+CI builds the same page both ways and compares them byte for byte. Cards
+come from the page's `hero.cards`, else from the site's:
+
+```toml
+[params.hero]
+  interval = 6000                     # ms between cards
+  label = "go-slides in pictures"     # the region's name
+[[params.hero.cards]]
+  terminal = true                     # the landing's hero-terminal.html
+[[params.hero.cards]]
+  img = "/img/hero/editor.png"        # with its intrinsic size
+  width = 1200
+  height = 750
+  alt = "The playground's editor"
+  caption = "Write a deck in your browser"
+  href = "/playground/"
+[[params.hero.cards]]
+  title = "VS Code"                   # a caption card
+  text = "The same preview beside your Markdown."
+  href = "https://…"
+  more = "Install"                    # the link's text (default "Read more")
+```
+
+- **No layout shift.** Every card sits in the same grid cell, so the hero
+  takes its tallest card's size from the first paint.
+- **LCP no worse.**
+  - The first card renders as written: a first image is eager and
+    `fetchpriority="high"`.
+  - The other cards' images wait in `data-src`. The next card's image is
+    fetched after the page's `load`, and each later one just before it
+    shows.
+- **WAI-ARIA APG carousel pattern**, as for the loading carousel. In
+  addition, ←/→ move between cards, and hidden cards are `aria-hidden` and
+  out of the tab order.
+- **`prefers-reduced-motion`**: no rotation and no fade.
+- `window.heroCarousel` exposes `show(n)`, `index` and `stopped`, for a test.
+  go-slides.github.io's `browsertest/hero.cjs` drives the carousel in Chrome.
+
+## The mantra strip (v0.5.0)
+
+Under the top bar of every page, two chips state what the fleet's code is:
+`LICENSE=BSD-3-Clause` and `CGO_ENABLED=0`. The licence uses its SPDX
+identifier. The chips are drawn by `styles.html` as CSS generated content
+on `.nav`, so they need no markup and no change to a landing's layout.
+
+```toml
+[params.mantra]
+  show = false                                        # an organisation for which it is not true
+  items = ["LICENSE=Apache-2.0", "CGO_ENABLED=0"]     # or other values: at most two
+```
+
+- **On by default.** Turn it off with `show = false`, or replace the values
+  with `items`.
+  - Items are checked at build time: at most two, made of
+    `A-Za-z0-9_.=:+/ -`, and up to 40 characters each.
+- **Turned off for one page** with `mantra: false` in its front matter.
+- **Always off on a `layout: playground` page**, whose stage is fixed under
+  the bar.
+- **The mantra off gives the page of v0.4.0, byte for byte.** CI checks this
+  against the base branch.
+
+Only claim what is true. Before turning the strip on, check the
+organisation's licences (`gh api repos/O/R/license`) and its cgo use.
+`go run github.com/go-fleettools/fleettools/cmd/mantracheck@latest <org>`
+does both checks.
 
 ## darkreader-lock
 

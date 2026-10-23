@@ -49,9 +49,25 @@ func TestNoPartialEndsWithANewline(t *testing.T) {
 		t.Fatal(err)
 	}
 	// ⛔ A walk that found nothing would pass every assertion above.
-	if seen < 6 {
-		t.Fatalf("found %d partials, want the 6 the kit ships", seen)
+	if seen < 7 {
+		t.Fatalf("found %d partials, want the 7 the kit ships", seen)
 	}
+}
+
+// contract checks that a partial still says what its README promises.
+func contract(t *testing.T, file string, wants []string) string {
+	t.Helper()
+	b, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := string(b)
+	for _, want := range wants {
+		if !strings.Contains(p, want) {
+			t.Errorf("%s lacks %q", file, want)
+		}
+	}
+	return p
 }
 
 // The loading carousel keeps its contract: the WAI-ARIA APG carousel
@@ -60,12 +76,7 @@ func TestNoPartialEndsWithANewline(t *testing.T) {
 // API. Its behaviour is driven in Chrome by the playgrounds that use it
 // (go-slides.github.io's browsertest/tour.cjs).
 func TestLoadingCarousel(t *testing.T) {
-	b, err := os.ReadFile("layouts/partials/loading-carousel.html")
-	if err != nil {
-		t.Fatal(err)
-	}
-	p := string(b)
-	for _, want := range []string{
+	p := contract(t, "layouts/partials/loading-carousel.html", []string{
 		`role="region" aria-roledescription="carousel"`, // the region
 		`aria-roledescription="slide"`,                  // labelled slides
 		`aria-label="Stop slide rotation"`,              // the rotation button, first in the region
@@ -79,13 +90,55 @@ func TestLoadingCarousel(t *testing.T) {
 		`window.landingkitCarousel=api`,     // the page's API
 		`downloaded:function`, `api.done=function(reveal,onWait)`,
 		`loading="lazy"`, `im.loading="eager"`, // nothing fetched unless shown; the next one preloaded
-	} {
-		if !strings.Contains(p, want) {
-			t.Errorf("loading-carousel.html lacks %q", want)
-		}
-	}
+	})
 	// The rotation button is the region's first control.
 	if strings.Index(p, `class="lk-car-rot"`) > strings.Index(p, `class="lk-car-slides"`) {
 		t.Error("the rotation button is not the first element of the region")
 	}
+}
+
+// The hero carousel keeps its contract. With no cards it is the landing's
+// hero-terminal.html and nothing else (CI compares two built pages byte for
+// byte); with cards it is an APG carousel whose cards share one grid cell
+// (no layout shift), whose later pictures wait in data-src, and which
+// neither rotates nor animates under reduced motion. Its behaviour is driven
+// in Chrome on go-slides.github.io (browsertest/hero.cjs).
+func TestHeroCarousel(t *testing.T) {
+	p := contract(t, "layouts/partials/hero-carousel.html", []string{
+		"{{- if not $cards -}}\n{{ partial \"hero-terminal.html\" . }}\n{{- else -}}", // no cards: the terminal alone
+		`role="region" aria-roledescription="carousel"`,
+		`aria-roledescription="slide"`,
+		`aria-label="Stop slide rotation"`,
+		`aria-live="off"`, `"polite"`,
+		`aria-label="Choose slide to display"`,
+		`aria-disabled`,
+		`"ArrowLeft"`, `"ArrowRight"`, // keyboard
+		`"focusin"`, `"mouseenter"`,
+		`prefers-reduced-motion: reduce`, `prefers-reduced-motion:reduce`,
+		`grid-area:1/1`,                    // every card in one cell: the hero's size from the first paint
+		`data-src`, `fetchpriority="high"`, // later pictures wait; the first may be the LCP
+		`addEventListener("load"`, // the next one after the page has loaded
+		`aria-hidden="true"`,      // hidden cards are hidden from assistive technology
+	})
+	if strings.Index(p, `class="hero-car-rot"`) > strings.Index(p, `class="hero-car-slides"`) {
+		t.Error("the rotation button is not the first element of the region")
+	}
+}
+
+// The mantra: on by default with the fleet's two values, off by
+// [params.mantra] show = false, by a page's `mantra: false`, and on the
+// full-viewport playground layout; at most two items, of a plain charset
+// (they become CSS strings). CI checks the chips reach the example's page
+// and that, turned off, the page is byte for byte the previous release's.
+func TestMantra(t *testing.T) {
+	contract(t, "layouts/partials/styles.html", []string{
+		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
+		`isset $mt "show"`,
+		`if eq .Params.mantra false`,
+		`if eq .Layout "playground"`,
+		`errorf "landingkit: [params.mantra] items holds at most two entries`,
+		"findRE `^[A-Za-z0-9_.=:+/ -]{1,40}$`",
+		`jsonify | safeCSS`,
+		`.nav{padding-bottom:34px}`,
+	})
 }

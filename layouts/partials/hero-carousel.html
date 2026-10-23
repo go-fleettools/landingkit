@@ -1,0 +1,156 @@
+{{- /*
+hero-carousel.html: the hero's visual as a carousel of cards, in place of the
+single terminal block. A landing moves its hero terminal (`<div class="term">…`)
+into layouts/partials/hero-terminal.html and calls
+
+  {{ partial "hero-carousel.html" . }}
+
+where the terminal was. With no cards configured it renders hero-terminal.html
+and NOTHING else, byte for byte: a landing that adopts it changes nothing until
+it lists cards. Cards come from the page's `hero.cards`, else the site's
+[params.hero] cards:
+
+  [[params.hero.cards]]
+    terminal = true                       # the landing's hero-terminal.html
+  [[params.hero.cards]]
+    img = "/img/hero/editor.png"          # with its intrinsic size: no layout shift
+    width = 1200
+    height = 750
+    alt = "The playground's editor"
+    caption = "Write a deck in your browser"
+    href = "/playground/"
+  [[params.hero.cards]]
+    title = "VS Code"                     # a short caption card
+    text = "The same preview beside your Markdown."
+    href = "https://…"
+
+[params.hero] interval = 6000 sets the rotation (ms).
+
+Every card is laid out in the same grid cell, so the hero takes the size of its
+tallest card from the first paint and nothing moves as they turn; only the
+current one is visible. The first card renders as written (an image eagerly,
+fetchpriority=high: it may be the page's LCP); the others' images carry their
+URL in data-src and are fetched just before they show. WAI-ARIA APG carousel
+pattern: a labelled region, the rotation button first, slides as labelled
+groups, dot buttons with aria-disabled on the current one, aria-live off while
+rotating, hover pauses, focus stops, ←/→ move between cards; under
+prefers-reduced-motion nothing rotates and nothing animates.
+*/ -}}
+{{- $hero := .Params.hero | default dict -}}
+{{- $cards := $hero.cards | default (.Site.Params.hero | default dict).cards -}}
+{{- if not $cards -}}
+{{ partial "hero-terminal.html" . }}
+{{- else -}}
+{{- $interval := (.Site.Params.hero | default dict).interval | default 6000 -}}
+{{- $n := len $cards -}}
+{{- $page := . -}}
+<section class="hero-car" role="region" aria-roledescription="carousel" aria-label="{{ $hero.label | default (.Site.Params.hero | default dict).label | default (printf "%s in pictures" .Site.Title) }}" data-interval="{{ $interval }}">
+  <button type="button" class="hero-car-rot" aria-label="Stop slide rotation"><span aria-hidden="true">❚❚</span></button>
+  <div class="hero-car-slides" aria-live="off" aria-atomic="false">
+    {{- range $i, $c := $cards }}
+    <div class="hero-car-card{{ if not $i }} on{{ end }}" role="group" aria-roledescription="slide" aria-label="{{ add $i 1 }} of {{ $n }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if $i }} aria-hidden="true"{{ end }}>
+      {{- if $c.terminal }}
+      {{ partial "hero-terminal.html" $page }}
+      {{- else if $c.img }}
+      <figure class="hero-car-fig">
+        {{- $img := printf `src="%s"` $c.img }}{{ if $i }}{{ $img = printf `data-src="%s"` $c.img }}{{ end }}
+        {{- with $c.href }}<a href="{{ . }}"{{ if $i }} tabindex="-1"{{ end }}>{{ end }}<img {{ $img | safeHTMLAttr }} alt="{{ $c.alt }}"{{ with $c.width }} width="{{ . }}"{{ end }}{{ with $c.height }} height="{{ . }}"{{ end }}{{ if $i }} decoding="async"{{ else }} fetchpriority="high"{{ end }}>{{ with $c.href }}</a>{{ end }}
+        {{- with $c.caption }}<figcaption>{{ . }}</figcaption>{{ end }}
+      </figure>
+      {{- else }}
+      <div class="hero-car-text">
+        {{- with $c.title }}<h3>{{ . }}</h3>{{ end }}
+        {{- with $c.text }}<p>{{ . }}</p>{{ end }}
+        {{- with $c.href }}<a class="btn btn-ghost" href="{{ . }}"{{ if $i }} tabindex="-1"{{ end }}>{{ $c.more | default "Read more" }} →</a>{{ end }}
+      </div>
+      {{- end }}
+    </div>
+    {{- end }}
+  </div>
+  {{- if gt $n 1 }}
+  <div class="hero-car-nav">
+    <button type="button" class="hero-car-prev" aria-label="Previous slide">‹</button>
+    <div class="hero-car-dots" role="group" aria-label="Choose slide to display">
+      {{- range $i, $c := $cards }}<button type="button" aria-label="Slide {{ add $i 1 }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if not $i }} aria-disabled="true"{{ end }}></button>{{ end -}}
+    </div>
+    <button type="button" class="hero-car-next" aria-label="Next slide">›</button>
+  </div>
+  {{- end }}
+</section>
+<style>
+.hero-car{position:relative;min-width:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;column-gap:8px}
+.hero-car-slides{display:grid;grid-column:1/-1;grid-row:1;align-items:center}
+.hero-car-nav{grid-column:2;grid-row:2}
+.hero-car-rot{grid-column:1;grid-row:2;justify-self:start;margin-top:12px}
+.hero-car-card{grid-area:1/1;min-width:0;visibility:hidden;opacity:0;transition:opacity .45s ease}
+.hero-car-card.on{visibility:visible;opacity:1}
+.hero-car-fig{margin:0}
+.hero-car-fig img{display:block;width:100%;height:auto;border-radius:16px;box-shadow:0 40px 80px -32px rgba(15,17,21,.55),0 0 0 1px var(--elev-border)}
+.hero-car-fig figcaption{margin-top:10px;font-size:13.5px;color:var(--slate);text-align:center}
+.hero-car-text{height:100%;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:28px;border:1px solid var(--line);border-radius:16px;background:var(--bg-soft)}
+.hero-car-text h3{margin:0;font-size:22px;letter-spacing:-.02em}
+.hero-car-text p{margin:0;color:var(--slate)}
+.hero-car-text .btn{align-self:flex-start}
+.hero-car-nav{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px}
+.hero-car button{appearance:none;border:0;background:none;color:var(--ink);cursor:pointer;font:inherit}
+.hero-car-nav>button{font-size:20px;width:30px;height:30px;border-radius:8px}
+.hero-car-nav>button:hover{background:var(--line)}
+.hero-car-dots{display:flex;gap:6px}
+.hero-car-dots button{width:9px;height:9px;padding:0;border-radius:50%;background:var(--line)}
+.hero-car-dots button[aria-disabled="true"]{background:var(--accent)}
+.hero-car .hero-car-rot{width:28px;height:28px;border-radius:8px;font-size:11px;color:var(--slate)}
+.hero-car .hero-car-rot:hover{background:var(--line)}
+.hero-car button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.hero-car-card{transition:none}}
+</style>
+<script>
+"use strict";
+(function(){
+  var box=document.currentScript.previousElementSibling.previousElementSibling;
+  if(!box||!box.classList.contains("hero-car"))return;
+  var cards=[].slice.call(box.querySelectorAll(".hero-car-card")),dots=[].slice.call(box.querySelectorAll(".hero-car-dots button"));
+  var live=box.querySelector(".hero-car-slides"),rot=box.querySelector(".hero-car-rot");
+  var every=parseInt(box.getAttribute("data-interval"),10)||6000,i=0,hover=false,timer=0;
+  var reduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+  var stopped=reduced||cards.length<2;
+  // an image's URL waits in data-src until its card is about to show
+  function load(n){[].forEach.call(cards[(n+cards.length)%cards.length].querySelectorAll("img[data-src]"),function(im){im.src=im.getAttribute("data-src");im.removeAttribute("data-src");});}
+  function show(n){
+    cards[i].classList.remove("on");cards[i].setAttribute("aria-hidden","true");
+    [].forEach.call(cards[i].querySelectorAll("a,button"),function(a){a.tabIndex=-1;});
+    if(dots[i])dots[i].removeAttribute("aria-disabled");
+    i=(n+cards.length)%cards.length;
+    load(i);
+    cards[i].classList.add("on");cards[i].removeAttribute("aria-hidden");
+    [].forEach.call(cards[i].querySelectorAll("a,button"),function(a){a.removeAttribute("tabindex");});
+    if(dots[i])dots[i].setAttribute("aria-disabled","true");
+    load(i+1);
+  }
+  function setStopped(s){
+    stopped=s;
+    rot.setAttribute("aria-label",s?"Start slide rotation":"Stop slide rotation");
+    rot.firstChild.textContent=s?"▶":"❚❚";
+    live.setAttribute("aria-live",s?"polite":"off");
+  }
+  if(cards.length<2){rot.hidden=true;return;}
+  setStopped(stopped);
+  // the next card's picture, once the page has loaded: never in the way of
+  // the first paint's own images (the hero's may be the page's LCP)
+  if(document.readyState==="complete")load(1);else window.addEventListener("load",function(){load(1);});
+  rot.addEventListener("click",function(){setStopped(!stopped);});
+  box.querySelector(".hero-car-prev").addEventListener("click",function(){show(i-1);});
+  box.querySelector(".hero-car-next").addEventListener("click",function(){show(i+1);});
+  dots.forEach(function(d,k){d.addEventListener("click",function(){show(k);});});
+  box.addEventListener("keydown",function(e){
+    if(e.key==="ArrowLeft"){show(i-1);e.preventDefault();}
+    else if(e.key==="ArrowRight"){show(i+1);e.preventDefault();}
+  });
+  box.addEventListener("mouseenter",function(){hover=true;});
+  box.addEventListener("mouseleave",function(){hover=false;});
+  // focus stops the rotation; only the rotation button starts it again
+  box.addEventListener("focusin",function(e){if(e.target!==rot&&!stopped)setStopped(true);});
+  timer=setInterval(function(){if(!stopped&&!hover&&!document.hidden)show(i+1);},every);
+  window.heroCarousel={show:show,get index(){return i;},get stopped(){return stopped;}};
+})();
+</script>
+{{- end -}}
