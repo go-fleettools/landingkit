@@ -130,20 +130,63 @@ func TestHeroCarousel(t *testing.T) {
 	}
 }
 
+// The strip says the licence and CGO_ENABLED=0; nothing else the kit renders
+// says them again. Only styles.html (the strip) and mantra-on.html (the
+// question it asks) may hold them: a partial that printed them would repeat
+// the strip on every page, and one that needs to must ask mantra-on.html.
+func TestNothingElseRepeatsTheMantra(t *testing.T) {
+	var seen int
+	err := filepath.WalkDir("layouts/partials", func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".html") {
+			return err
+		}
+		seen++
+		base := filepath.Base(path)
+		if base == "styles.html" || base == "mantra-on.html" {
+			return nil
+		}
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		for _, w := range []string{"BSD-3", "BSD 3", "CGO_ENABLED", "cgo", "no cgo"} {
+			if strings.Contains(strings.ToLower(string(b)), strings.ToLower(w)) && !strings.Contains(string(b), `partial "mantra-on.html"`) {
+				t.Errorf("%s says %q without asking mantra-on.html", path, w)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if seen < 8 {
+		t.Fatalf("walked %d partials", seen)
+	}
+}
+
 // The mantra: on by default with the fleet's two values, off by
 // [params.mantra] show = false, by a page's `mantra: false`, and on the
-// full-viewport playground layout; at most two items, of a plain charset
-// (they become CSS strings). CI checks the chips reach the example's page
-// and that, turned off, the page is byte for byte the previous release's.
+// full-viewport playground layout; at most four items (a data licence such
+// as `fonts: OFL-1.1` beside the code's), of a plain charset (they become
+// CSS strings). CI checks the chips reach the example's page, that four
+// reach a page built with four, and that, turned off, the page is byte for
+// byte the previous release's.
 func TestMantra(t *testing.T) {
-	contract(t, "layouts/partials/styles.html", []string{
+	contract(t, "layouts/partials/mantra-on.html", []string{
 		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
 		`isset $mt "show"`,
 		`if eq .Params.mantra false`,
 		`if eq .Layout "playground"`,
-		`errorf "landingkit: [params.mantra] items holds at most two entries`,
-		"findRE `^[A-Za-z0-9_.=:+/ -]{1,40}$`",
+		`return (and $show (gt (len $items) 0))`,
+	})
+	contract(t, "layouts/partials/styles.html", []string{
+		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
+		`$show := partial "mantra-on.html" .`, // one answer, shared with the landings
+		`errorf "landingkit: [params.mantra] items holds at most four entries`,
+		"findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$`",
 		`jsonify | safeCSS`,
 		`.nav{padding-bottom:34px}`,
+		`.nav>.wrap::before{content:`, `.nav>.wrap::after{content:`, // the third and fourth chips
+		`.nav{padding-bottom:{{ add 34 (mul 29 $extra) }}px}`, // a row per data chip on a phone
 	})
 }
