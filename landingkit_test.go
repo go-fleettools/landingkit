@@ -123,6 +123,11 @@ func TestHeroCarousel(t *testing.T) {
 	if strings.Index(p, `class="hero-car-rot"`) > strings.Index(p, `class="hero-car-slides"`) {
 		t.Error("the rotation button is not the first element of the region")
 	}
+	// The sheet precedes the markup: a page that arrives in pieces must not
+	// paint the cards unstyled, stacked, and then collapse them (a shift).
+	if st, sec := strings.Index(p, "<style>"), strings.Index(p, "<section"); st < 0 || sec < 0 || st > sec {
+		t.Error("the carousel's <style> does not come before its <section>")
+	}
 }
 
 // The mantra: on by default with the fleet's two values, off by
