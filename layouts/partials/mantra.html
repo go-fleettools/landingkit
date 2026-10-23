@@ -1,0 +1,14 @@
+{{- /*
+mantra.html: the strip under the top bar, as TEXT. Until v0.7.0 the chips
+were CSS generated content (.nav::before{content:"…"}): they looked right
+and were not text at all, so nothing could select, find, index or reliably
+read them, and a page check reading text saw none. theme-toggle.html, which
+every landing calls inside its nav bar, renders this, so a landing needs no
+change to get it. The first two chips are the code's (licence, cgo), any
+further ones name data under another licence; they are two rows, so a
+phone can put the data chips under the code's.
+*/ -}}
+{{- if partial "mantra-on.html" . -}}
+{{- $items := partial "mantra-items.html" . -}}
+<div class="mantra" role="note" aria-label="Licence and build of this organisation's code"><span class="mantra-row">{{ range first 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ if gt (len $items) 2 }}<span class="mantra-row">{{ range after 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ end }}</div>
+{{- end -}}

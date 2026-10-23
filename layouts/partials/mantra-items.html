@@ -1,0 +1,12 @@
+{{- /*
+mantra-items.html: the strip's chips, [params.mantra] items or the fleet's
+two, checked: at most four, each a plain string (letters, digits, spaces
+and _.=:+/,-, at most 40 characters). mantra-on.html, mantra.html and
+styles.html all read them here, so they can never disagree.
+*/ -}}
+{{- $mt := .Site.Params.mantra | default dict -}}
+{{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" -}}
+{{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end -}}
+{{- if gt (len $items) 4 }}{{ errorf "landingkit: [params.mantra] items holds at most four entries, got %d" (len $items) }}{{ end -}}
+{{- range $items }}{{ if not (findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$` .) }}{{ errorf "landingkit: [params.mantra] item %q: letters, digits, spaces and _.=:+/,- only, at most 40" . }}{{ end }}{{ end -}}
+{{- return $items -}}

@@ -13,6 +13,5 @@ styles.html asks the same question here, so the two can never disagree.
 {{- if isset $mt "show" }}{{ $show = $mt.show }}{{ end -}}
 {{- if eq .Params.mantra false }}{{ $show = false }}{{ end -}}
 {{- if eq .Layout "playground" }}{{ $show = false }}{{ end -}}
-{{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" -}}
-{{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end -}}
+{{- $items := partial "mantra-items.html" . -}}
 {{- return (and $show (gt (len $items) 0)) -}}
