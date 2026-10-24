@@ -189,7 +189,9 @@ jobs:
       - name: the mantra off, the page is the pre-mantra base's byte for byte
         if: github.event_name == 'pull_request'
         run: |
-          if grep -q 'Params.mantra' base/layouts/partials/styles.html; then
+          # the mantra moved out of styles.html in v0.7.0 (mantra-on.html,
+          # mantra-items.html): look for it in any partial
+          if grep -rq 'mantra' base/layouts/partials/; then
             echo "the base already has the mantra: nothing pre-mantra to compare with"; exit 0
           fi
           (cd base/example && hugo --destination "$RUNNER_TEMP/base-example")

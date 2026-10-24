@@ -446,6 +446,23 @@ without a version, so inside a landing that requires this module the version
 comes from the landing's `go.mod`: Renovate's bump of the partials bumps the
 checker with them.
 
+### A rate limit is not a broken link (v0.7.1)
+
+A 429 Too Many Requests ([RFC 6585 §4](https://www.rfc-editor.org/rfc/rfc6585#section-4)),
+or a 503 that carries a `Retry-After` ([RFC 9110 §10.2.3](https://www.rfc-editor.org/rfc/rfc9110#section-10.2.3)),
+means "not now", not "not found". Such a link is retried:
+
+- each wait is the larger of an exponential backoff (`-wait`, then twice
+  that, and so on) and what `Retry-After` asks for, in seconds or as an
+  HTTP-date;
+- no wait is longer than `-max-retry-after` (60 s by default).
+
+If every try is rate limited, the link is reported `WARN … unknown`, with a
+warning, and it does not fail the check. A 404, a 410, a 503 without
+`Retry-After`, or no answer at all still fail. There is no allowlist: the
+case that prompted this (go-llmflow's link to docs.vllm.ai, which answered
+429 to the CI runner) needed none.
+
 ### What it does not see
 
 Only the `<style>` block and the background. A landing whose `index.html`

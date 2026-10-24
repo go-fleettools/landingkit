@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -88,15 +89,46 @@ func siteURLs(dir string) ([]string, error) {
 }
 
 // status is the HTTP status of one GET, following redirects, or 0 when there
-// was no answer at all (curl's 000).
-func status(c *http.Client, u string) int {
+// was no answer at all (curl's 000), and the wait the server asked for in a
+// Retry-After header (0 when it gave none).
+func status(c *http.Client, u string) (code int, ra time.Duration, had bool) {
 	resp, err := c.Get(u)
 	if err != nil {
-		return 0
+		return 0, 0, false
 	}
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
-	return resp.StatusCode
+	h := resp.Header.Get("Retry-After")
+	return resp.StatusCode, retryAfter(h, now()), h != ""
+}
+
+// now is the clock Retry-After dates are read against; the tests fix it.
+var now = time.Now
+
+// retryAfter reads a Retry-After value (RFC 9110 §10.2.3): delay-seconds, or
+// an HTTP-date. Anything else, or a date in the past, is no wait at all.
+func retryAfter(v string, t time.Time) time.Duration {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	if n, err := strconv.Atoi(v); err == nil {
+		if n < 0 {
+			return 0
+		}
+		return time.Duration(n) * time.Second
+	}
+	if d, err := http.ParseTime(v); err == nil && d.After(t) {
+		return d.Sub(t)
+	}
+	return 0
+}
+
+// rateLimited: the server says "not now", not "no such page". 429 Too Many
+// Requests (RFC 6585 §4) always, 503 Service Unavailable only with a
+// Retry-After -- a 503 without one is a broken server, and fails as before.
+func rateLimited(code int, had bool) bool {
+	return code == http.StatusTooManyRequests || code == http.StatusServiceUnavailable && had
 }
 
 func cmdLinks(args []string, stdout, stderr io.Writer) int {
@@ -105,6 +137,7 @@ func cmdLinks(args []string, stdout, stderr io.Writer) int {
 	attempts := fl.Int("attempts", 3, "tries per URL: one is a flake detector rather than a link checker")
 	wait := fl.Duration("wait", 3*time.Second, "pause between tries")
 	timeout := fl.Duration("timeout", 25*time.Second, "time allowed per request")
+	maxWait := fl.Duration("max-retry-after", 60*time.Second, "the longest Retry-After honoured; a rate-limited link waits at most this long per try")
 	fl.Usage = func() {
 		fmt.Fprint(stderr, "usage: landingkit links [flags] <built-site-dir>\n")
 		fl.PrintDefaults()
@@ -130,31 +163,59 @@ func cmdLinks(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "checking %d distinct URLs\n", len(urls))
 	client := &http.Client{Timeout: *timeout}
-	failed := 0
+	failed, unknown := 0, 0
 	for _, u := range urls {
 		// img.shields.io renders anything asked of it and proves nothing.
 		if strings.Contains(u, "img.shields.io") {
 			continue
 		}
-		p, code := probe(u), 0
+		p, code, limited := probe(u), 0, false
 		for try := 1; try <= *attempts; try++ {
-			if code = status(client, p); code >= 200 && code < 400 {
+			var ra time.Duration
+			var had bool
+			code, ra, had = status(client, p)
+			if code >= 200 && code < 400 {
+				limited = false
 				break
 			}
-			if try < *attempts {
-				sleep(*wait)
+			limited = rateLimited(code, had)
+			if try == *attempts {
+				break
 			}
+			// a rate-limited server is given what it asked for, within a
+			// bound, and at least an exponential backoff; anything else
+			// the plain pause between tries
+			pause := *wait
+			if limited {
+				pause = *wait << (try - 1)
+				if ra > pause {
+					pause = ra
+				}
+				if pause > *maxWait {
+					pause = *maxWait
+				}
+			}
+			sleep(pause)
 		}
 		via := ""
 		if p != u {
 			via = "  (via " + p + ")"
 		}
-		if code >= 200 && code < 400 {
+		switch {
+		case code >= 200 && code < 400:
 			fmt.Fprintf(stdout, "  ok   %03d  %s%s\n", code, u, via)
-			continue
+		case limited:
+			// "not now" is not "not found": the link is unknown, said, and
+			// does not fail the check; a 404, a 410 or no answer still do
+			fmt.Fprintf(stdout, "  WARN %03d  %s%s  (rate limited after %d tries: unknown, not counted as broken)\n", code, u, via, *attempts)
+			unknown++
+		default:
+			fmt.Fprintf(stdout, "  FAIL %03d  %s%s\n", code, u, via)
+			failed++
 		}
-		fmt.Fprintf(stdout, "  FAIL %03d  %s%s\n", code, u, via)
-		failed++
+	}
+	if unknown > 0 {
+		fmt.Fprintf(stderr, "landingkit: warning: %d link(s) could not be checked: the server rate-limited every try\n", unknown)
 	}
 	if failed > 0 {
 		fmt.Fprintf(stderr, "landingkit: %d link(s) or image(s) do not resolve\n", failed)
