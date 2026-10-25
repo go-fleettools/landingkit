@@ -4,7 +4,7 @@
      same CSS showed on go-ndarray -- so it is told to stand down, as
      go-pdfkit's page and our Hextra fork already do. This partial is
      included in <head>, so every landing on the kit gets the flag. */}}
-<meta name="darkreader-lock">
+<meta name="darkreader-lock">{{ partial "i18n-head.html" . }}
 {{/* The brand colours are the ONLY thing that differs between the orgs using
      this stylesheet, and they are read from [params.brand] rather than written
      in. Two byte-identical copies of this file already existed in go-authn and
@@ -310,9 +310,9 @@
   /* Family-standard three-state theme toggle: System → Light → Dark, persisted in localStorage. */
   (function(){
     var order=['system','light','dark'], root=document.documentElement;
-    var labels={system:'🖥️ System',light:'☀️ Light',dark:'🌙 Dark'};
+    var labels={system:'🖥️ {{ i18n "kit_themeSystem" | safeJS }}',light:'☀️ {{ i18n "kit_themeLight" | safeJS }}',dark:'🌙 {{ i18n "kit_themeDark" | safeJS }}'};
     function apply(m){ if(m==='system'){root.removeAttribute('data-theme');}else{root.setAttribute('data-theme',m);} localStorage.setItem('theme',m); var el=document.getElementById('theme-label'); if(el)el.textContent=labels[m]; }
     function init(){ var mode=localStorage.getItem('theme')||'system'; apply(mode); var btn=document.getElementById('theme-toggle'); if(btn) btn.addEventListener('click',function(){ mode=order[(order.indexOf(mode)+1)%order.length]; apply(mode); }); }
     if(document.readyState!=='loading') init(); else document.addEventListener('DOMContentLoaded',init);
   })();
-</script>
+</script>{{ partial "i18n-style.html" . }}

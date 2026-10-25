@@ -77,15 +77,15 @@ func contract(t *testing.T, file string, wants []string) string {
 // (go-slides.github.io's browsertest/tour.cjs).
 func TestLoadingCarousel(t *testing.T) {
 	p := contract(t, "layouts/partials/loading-carousel.html", []string{
-		`role="region" aria-roledescription="carousel"`, // the region
-		`aria-roledescription="slide"`,                  // labelled slides
-		`aria-label="Stop slide rotation"`,              // the rotation button, first in the region
-		`aria-live="off"`, `"polite"`,                   // live only when stopped
-		`aria-label="Choose slide to display"`, // the dots' group
-		`aria-disabled`,                        // the current dot stays focusable
-		`prefers-reduced-motion: reduce`,       // no rotation …
-		`prefers-reduced-motion:reduce`,        // … and no animation
-		`"focusin"`, `"mouseenter"`,            // focus stops, hover pauses
+		`role="region" aria-roledescription="carousel"`,         // the region
+		`aria-roledescription="slide"`,                          // labelled slides
+		`aria-label="{{ i18n "kit_stopRotation" | safeHTML }}"`, // the rotation button, first in the region
+		`aria-live="off"`, `"polite"`, // live only when stopped
+		`aria-label="{{ i18n "kit_chooseSlide" | safeHTML }}"`, // the dots' group
+		`aria-disabled`,                  // the current dot stays focusable
+		`prefers-reduced-motion: reduce`, // no rotation …
+		`prefers-reduced-motion:reduce`,  // … and no animation
+		`"focusin"`, `"mouseenter"`,      // focus stops, hover pauses
 		`if(st.done||st.downloaded)return;`, // the cached-load skip
 		`window.landingkitCarousel=api`,     // the page's API
 		`downloaded:function`, `api.done=function(reveal,onWait)`,
@@ -108,9 +108,9 @@ func TestHeroCarousel(t *testing.T) {
 		"{{- if not $cards -}}\n{{ partial \"hero-terminal.html\" . }}\n{{- else -}}", // no cards: the terminal alone
 		`role="region" aria-roledescription="carousel"`,
 		`aria-roledescription="slide"`,
-		`aria-label="Stop slide rotation"`,
+		`aria-label="{{ i18n "kit_stopRotation" | safeHTML }}"`,
 		`aria-live="off"`, `"polite"`,
-		`aria-label="Choose slide to display"`,
+		`aria-label="{{ i18n "kit_chooseSlide" | safeHTML }}"`,
 		`aria-disabled`,
 		`"ArrowLeft"`, `"ArrowRight"`, // keyboard
 		`"focusin"`, `"mouseenter"`,

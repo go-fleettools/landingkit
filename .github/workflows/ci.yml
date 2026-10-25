@@ -199,6 +199,50 @@ jobs:
           (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/mantra-off.toml" --destination "$RUNNER_TEMP/mantra-off")
           cmp "$RUNNER_TEMP/base-example/index.html" "$RUNNER_TEMP/mantra-off/index.html"
           echo "show = false builds the base's index.html exactly"
+      # i18n (v0.8.0): a site with ONE language is the page it was, byte for
+      # byte (the words moved into i18n/en.yaml, the selector and the hreflang
+      # print nothing), and a site with several gets a selector, hreflang, a
+      # lang that is the locale, and translated words. Only meaningful while
+      # the base has no i18n (the pull request that introduced it); said, not
+      # hidden, after.
+      - name: one language, the page is the base's byte for byte
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -d base/i18n ]; then
+            echo "the base already has i18n: nothing pre-i18n to compare with"; exit 0
+          fi
+          (cd base/example && hugo --destination "$RUNNER_TEMP/base-example-i18n")
+          diff -r "$RUNNER_TEMP/base-example-i18n" "$RUNNER_TEMP/example"
+          echo "every page of example/ is the base's, byte for byte"
+      - name: one language prints no selector and no hreflang
+        run: |
+          for f in "$RUNNER_TEMP"/example/index.html "$RUNNER_TEMP"/example/carousel/index.html; do
+            for bad in 'data-lang-selector' 'hreflang' 'lang-btn' 'lang-menu'; do
+              if grep -qF -- "$bad" "$f"; then echo "::error::$f has $bad on a one-language site"; exit 1; fi
+            done
+          done
+          echo "no selector, no hreflang on a one-language site"
+      - name: several languages get a selector, hreflang, lang and translated words
+        run: |
+          (cd example-i18n && hugo --panicOnWarning --destination "$RUNNER_TEMP/example-i18n")
+          out="$RUNNER_TEMP/example-i18n"
+          check() { grep -qF -- "$2" "$out/$1" || { echo "::error::$1 lacks $2"; exit 1; }; }
+          check index.html '<html lang="en">'
+          check zh/index.html '<html lang="zh-Hans">'
+          check ja/index.html '<html lang="ja">'
+          check zh/index.html '<link rel="alternate" hreflang="zh-Hans" href="https://example.invalid/zh/">'
+          check index.html '<link rel="alternate" hreflang="x-default" href="https://example.invalid/">'
+          check index.html 'data-lang-selector'
+          # the selector lists each language by its own name, linking to the same page
+          for name in 'English' 'Français' '简体中文' '日本語' '한국어'; do check index.html ">$name</a>"; done
+          check about/index.html 'href="/fr/about/"'
+          # a language without the page falls back to that language's home
+          check about/index.html 'href="/zh/" lang="zh-Hans"'
+          # the kit's words are the language's
+          check zh/index.html '🖥️ 跟随系统'
+          check fr/index.html 'Forkez-moi sur GitHub'
+          check ko/index.html 'html:lang(ko) body.lm{font-family'
+          echo "the multilingual example has what it must"
       - name: go mod tidy keeps the requirement
         working-directory: example
         run: |
@@ -225,6 +269,13 @@ jobs:
         run: |
           "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
             -out "$RUNNER_TEMP/self" example example | tee "$RUNNER_TEMP/self.log"
+      # The multilingual site's sheet is the reference's: the language CSS is a
+      # second <style> block, which verify does not read, so a landing that
+      # turns languages on still passes verify against the reference.
+      - name: verify the multilingual example against the reference (must pass)
+        run: |
+          "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \
+            -out "$RUNNER_TEMP/i18n-verify" example-i18n example | tee "$RUNNER_TEMP/i18n-verify.log"
       # The false FAIL v0.2.0 gave: a tall full-width band (go-embedded-ruby's
       # .strip, on --bg-soft) at the height where fixed points used to sample.
       # The site has it, the reference does not, the backgrounds are equal:

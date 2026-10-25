@@ -73,11 +73,11 @@ them into one cell, a layout shift. */}}
 .hero-car button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.hero-car-card{transition:none}}
 </style>
-<section class="hero-car" role="region" aria-roledescription="carousel" aria-label="{{ $hero.label | default (.Site.Params.hero | default dict).label | default (printf "%s in pictures" .Site.Title) }}" data-interval="{{ $interval }}">
-  <button type="button" class="hero-car-rot" aria-label="Stop slide rotation"><span aria-hidden="true">❚❚</span></button>
+<section class="hero-car" role="region" aria-roledescription="carousel" aria-label="{{ $hero.label | default (.Site.Params.hero | default dict).label | default (i18n "kit_heroLabel" (dict "title" .Site.Title)) }}" data-interval="{{ $interval }}">
+  <button type="button" class="hero-car-rot" aria-label="{{ i18n "kit_stopRotation" | safeHTML }}"><span aria-hidden="true">❚❚</span></button>
   <div class="hero-car-slides" aria-live="off" aria-atomic="false">
     {{- range $i, $c := $cards }}
-    <div class="hero-car-card{{ if not $i }} on{{ end }}" role="group" aria-roledescription="slide" aria-label="{{ add $i 1 }} of {{ $n }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if $i }} aria-hidden="true"{{ end }}>
+    <div class="hero-car-card{{ if not $i }} on{{ end }}" role="group" aria-roledescription="slide" aria-label="{{ i18n "kit_nOfM" (dict "n" (add $i 1) "m" $n) | safeHTML }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if $i }} aria-hidden="true"{{ end }}>
       {{- if $c.terminal }}
       {{ partial "hero-terminal.html" $page }}
       {{- else if $c.img }}
@@ -90,7 +90,7 @@ them into one cell, a layout shift. */}}
       <div class="hero-car-text">
         {{- with $c.title }}<h3>{{ . }}</h3>{{ end }}
         {{- with $c.text }}<p>{{ . }}</p>{{ end }}
-        {{- with $c.href }}<a class="btn btn-ghost" href="{{ . }}"{{ if $i }} tabindex="-1"{{ end }}>{{ $c.more | default "Read more" }} →</a>{{ end }}
+        {{- with $c.href }}<a class="btn btn-ghost" href="{{ . }}"{{ if $i }} tabindex="-1"{{ end }}>{{ $c.more | default (i18n "kit_readMore") }} →</a>{{ end }}
       </div>
       {{- end }}
     </div>
@@ -98,11 +98,11 @@ them into one cell, a layout shift. */}}
   </div>
   {{- if gt $n 1 }}
   <div class="hero-car-nav">
-    <button type="button" class="hero-car-prev" aria-label="Previous slide">‹</button>
-    <div class="hero-car-dots" role="group" aria-label="Choose slide to display">
-      {{- range $i, $c := $cards }}<button type="button" aria-label="Slide {{ add $i 1 }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if not $i }} aria-disabled="true"{{ end }}></button>{{ end -}}
+    <button type="button" class="hero-car-prev" aria-label="{{ i18n "kit_previousSlide" | safeHTML }}">‹</button>
+    <div class="hero-car-dots" role="group" aria-label="{{ i18n "kit_chooseSlide" | safeHTML }}">
+      {{- range $i, $c := $cards }}<button type="button" aria-label="{{ i18n "kit_slideN" (dict "n" (add $i 1)) | safeHTML }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if not $i }} aria-disabled="true"{{ end }}></button>{{ end -}}
     </div>
-    <button type="button" class="hero-car-next" aria-label="Next slide">›</button>
+    <button type="button" class="hero-car-next" aria-label="{{ i18n "kit_nextSlide" | safeHTML }}">›</button>
   </div>
   {{- end }}
 </section>
@@ -131,7 +131,7 @@ them into one cell, a layout shift. */}}
   }
   function setStopped(s){
     stopped=s;
-    rot.setAttribute("aria-label",s?"Start slide rotation":"Stop slide rotation");
+    rot.setAttribute("aria-label",s?"{{ i18n "kit_startRotation" | safeJS }}":"{{ i18n "kit_stopRotation" | safeJS }}");
     rot.firstChild.textContent=s?"▶":"❚❚";
     live.setAttribute("aria-live",s?"polite":"off");
   }

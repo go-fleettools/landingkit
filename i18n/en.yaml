@@ -1,0 +1,24 @@
+# The words the kit's partials write, in English: the language of every site that
+# declares no other, whose pages must stay byte for byte what they were before
+# these strings moved here (TestEnglishIsTheOldText). A site's own
+# i18n/<lang>.yaml overrides any of them; a language the kit has no file for
+# falls back to these.
+kit_language: "Language"
+kit_forkMe: "Fork me on GitHub"
+kit_themeToggle: "Toggle light, dark or system theme"
+kit_themeSystem: "System"
+kit_themeLight: "Light"
+kit_themeDark: "Dark"
+kit_mantra: "Licence and build of this organisation's code"
+kit_stopRotation: "Stop slide rotation"
+kit_startRotation: "Start slide rotation"
+kit_previousSlide: "Previous slide"
+kit_nextSlide: "Next slide"
+kit_chooseSlide: "Choose slide to display"
+kit_slideN: "Slide {{ .n }}"
+kit_nOfM: "{{ .n }} of {{ .m }}"
+kit_readMore: "Read more"
+kit_about: "about {{ .title }}"
+kit_heroLabel: "{{ .title }} in pictures"
+kit_carouselLabel: "What this project does"
+kit_start: "Start"

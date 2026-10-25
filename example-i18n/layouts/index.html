@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="{{ partial "html-lang.html" site.Language }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }}</title>
+{{ partial "styles.html" . }}
+</head>
+<body class="lm">
+<header class="nav"><div class="wrap nav-in">
+  <a class="brand" href="{{ site.Home.RelPermalink }}">{{ .Site.Title }}</a>
+  {{ partial "theme-toggle.html" . }}
+</div></header>
+{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}
+<main>
+  <section class="hero"><div class="wrap">
+    <h1 class="head">{{ .Title }}</h1>
+    <p id="body">{{ .Content }}</p>
+  </div></section>
+</main>
+</body>
+</html>
