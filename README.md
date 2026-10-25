@@ -24,6 +24,10 @@ Renovate proposes the bump.
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
+| `i18n/<lang>.yaml` | the words the partials write (labels, aria-labels, "Read more"…), in English, French, German, Spanish, Simplified Chinese, Korean and Japanese (v0.8.0) |
+| `layouts/partials/language-selector.html` | the language combo of the top bar; nothing on a site with one language (v0.8.0) |
+| `layouts/partials/i18n-head.html`, `i18n-style.html` | the hreflang alternates, and the selector's and the CJK languages' sheet, a second `<style>`; nothing on a site with one language (v0.8.0) |
+| `layouts/partials/html-lang.html`, `language-label.html` | a Language's locale (`zh-Hans`) for `lang=`, and its name in its own language (v0.8.0) |
 | `cmd/landingkit` | `brand`, `verify` and `links`, below |
 | `workflows/links.yml` | a template for a landing's link check, running `landingkit links` at the version the landing pins |
 | `example/` | the smallest site importing the module; CI builds it and verifies it |
@@ -334,6 +338,61 @@ Only claim what is true. Before turning the strip on, check the
 organisation's licences (`gh api repos/O/R/license`) and its cgo use.
 `go run github.com/go-fleettools/fleettools/cmd/mantracheck@latest <org>`
 does both checks.
+
+## Languages (v0.8.0)
+
+A landing in one language is **exactly the page it was**: the words the
+partials write moved into `i18n/en.yaml`, and the page built from them equals
+the previous release's byte for byte (CI builds `example/` with both and
+runs `diff -r`; `TestEnglishIsTheOldText` pins the strings). The other ~290
+landings change by nothing, and need no change.
+
+A landing that wants several languages declares them in `hugo.toml` and
+writes a page per language; the kit does the rest:
+
+```toml
+defaultContentLanguage = "en"
+defaultContentLanguageInSubdir = false   # English at the root, /fr/… for the others
+
+[languages.en]
+  label = "English"
+  weight = 1
+[languages.zh]
+  label = "简体中文"      # each language in its own name
+  locale = "zh-Hans"     # lang= and hreflang=
+  weight = 2
+```
+
+- **The selector.** `theme-toggle.html`, which every landing calls inside its
+  nav bar, renders `language-selector.html` before the theme button: a
+  disclosure with the current language's name and a menu of every language,
+  each linking to **the same page** in that language, or to that language's
+  home when the page has no translation (Escape closes it, the arrows move in
+  it, a click outside closes it). On a phone only the 🌐 shows.
+- **`lang` and `hreflang`.** `styles.html` (in `<head>`) adds
+  `<link rel="alternate" hreflang="…">` for each translation of the page, with
+  `x-default` for the first language by weight. The landing's own
+  `<html lang="en">` becomes
+  `<html lang="{{ partial "html-lang.html" site.Language }}">`: the language's
+  `locale` (`zh-Hans`, so that a browser draws the Han characters Chinese and
+  Japanese share with the right glyphs), else its key.
+- **The kit's words** (`i18n/<lang>.yaml`, keys `kit_…`) exist in English,
+  French, German, Spanish, Simplified Chinese, Korean and Japanese. A site's
+  own `i18n/<lang>.yaml` overrides any of them; a language the kit has no file
+  for falls back to English. `TestEveryLanguageHasEveryKey` holds the files to
+  the same keys and the same placeholders.
+- **CJK.** The language sheet gives `zh-Hans`, `ja` and `ko` a font stack that
+  names the CJK system fonts (PingFang, Hiragino, Noto Sans CJK, Apple SD Gothic
+  Neo, Malgun Gothic, Yu Gothic, Microsoft YaHei), and lets long runs wrap.
+- **`landingkit verify` still passes.** The selector's and the CJK sheet is a
+  **second** `<style>` block, which `verify` does not read (CI verifies
+  `example-i18n/` against `example/`).
+- **Hugo 0.158 or later** for a multilingual landing (`label`, `locale`,
+  `hugo.Sites`). One language needs nothing new.
+
+What a landing's own prose says in each language is the landing's: its
+`i18n/<lang>.yaml` and per-language params. `example-i18n/` is the smallest
+multilingual site.
 
 ## darkreader-lock
 

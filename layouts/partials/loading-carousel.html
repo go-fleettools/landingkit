@@ -28,7 +28,7 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
 {{- $pictures := .pictures | default "" -}}
 {{- $ext := .ext | default ".jpg" -}}
 {{- $suffix := .suffix | default "" -}}
-{{- $more := .more | default "Read more" -}}
+{{- $more := .more | default (i18n "kit_readMore") -}}
 {{- $w := .width | default 320 -}}{{- $h := .height | default 180 -}}
 {{- with $cards -}}
 <style>
@@ -53,26 +53,26 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
 .lk-car-fading{opacity:0!important;pointer-events:none;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){.lk-car-card.enter{animation:none}.lk-car-fading{transition:none}}
 </style>
-<section id="{{ $id }}" class="lk-car" role="region" aria-roledescription="carousel" aria-label="{{ $.label | default "What this project does" }}" hidden data-delay="{{ $.delay | default 300 }}" data-every="{{ $.every | default 4500 }}" data-idle="{{ $.idle | default 6000 }}" data-fade="{{ $.fade | default $id }}">
-  <button type="button" class="lk-car-rot" id="{{ $id }}-rot" aria-label="Stop slide rotation"><span aria-hidden="true">❚❚</span></button>
+<section id="{{ $id }}" class="lk-car" role="region" aria-roledescription="carousel" aria-label="{{ $.label | default (i18n "kit_carouselLabel") }}" hidden data-delay="{{ $.delay | default 300 }}" data-every="{{ $.every | default 4500 }}" data-idle="{{ $.idle | default 6000 }}" data-fade="{{ $.fade | default $id }}">
+  <button type="button" class="lk-car-rot" id="{{ $id }}-rot" aria-label="{{ i18n "kit_stopRotation" | safeHTML }}"><span aria-hidden="true">❚❚</span></button>
   <div class="lk-car-slides" id="{{ $id }}-slides" aria-live="off" aria-atomic="false">
     {{- range $i, $c := . }}
-    <div class="lk-car-card" role="group" aria-roledescription="slide" aria-label="{{ add $i 1 }} of {{ $n }}: {{ $c.title }}"{{ if $i }} hidden{{ end }}>
+    <div class="lk-car-card" role="group" aria-roledescription="slide" aria-label="{{ i18n "kit_nOfM" (dict "n" (add $i 1) "m" $n) | safeHTML }}: {{ $c.title }}"{{ if $i }} hidden{{ end }}>
       <a class="lk-car-pic" href="{{ $c.href }}" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true"><img src="{{ with $c.img }}{{ . }}{{ else }}{{ printf "%s%d%s%s" $pictures (add $i 1) $ext $suffix }}{{ end }}" width="{{ $w }}" height="{{ $h }}" alt="" loading="lazy" decoding="async"></a>
       <h3>{{ $c.title }}</h3>
-      <p>{{ $c.text }} <a href="{{ $c.href }}" target="_blank" rel="noopener">{{ $more }}<span class="lk-car-sr"> about {{ $c.title }}</span> →</a></p>
+      <p>{{ $c.text }} <a href="{{ $c.href }}" target="_blank" rel="noopener">{{ $more }}<span class="lk-car-sr"> {{ i18n "kit_about" (dict "title" $c.title) | safeHTML }}</span> →</a></p>
     </div>
     {{- end }}
   </div>
   <div class="lk-car-nav">
-    <button type="button" id="{{ $id }}-prev" aria-label="Previous slide">‹</button>
-    <div role="group" aria-label="Choose slide to display" class="lk-car-dots">
+    <button type="button" id="{{ $id }}-prev" aria-label="{{ i18n "kit_previousSlide" | safeHTML }}">‹</button>
+    <div role="group" aria-label="{{ i18n "kit_chooseSlide" | safeHTML }}" class="lk-car-dots">
       {{- range $i, $c := . }}<button type="button" aria-label="{{ $c.title }}"{{ if not $i }} aria-disabled="true"{{ end }}></button>{{ end -}}
     </div>
-    <button type="button" id="{{ $id }}-next" aria-label="Next slide">›</button>
+    <button type="button" id="{{ $id }}-next" aria-label="{{ i18n "kit_nextSlide" | safeHTML }}">›</button>
   </div>
 </section>
-<button type="button" id="{{ $id }}-start" class="btn btn-primary lk-car-start" hidden>{{ $.start | default "Start" }}</button>
+<button type="button" id="{{ $id }}-start" class="btn btn-primary lk-car-start" hidden>{{ $.start | default (i18n "kit_start") }}</button>
 <script>
 "use strict";
 (function(){
@@ -100,7 +100,7 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
   }
   function setStopped(s){
     stopped=s;
-    rot.setAttribute("aria-label",s?"Start slide rotation":"Stop slide rotation");
+    rot.setAttribute("aria-label",s?"{{ i18n "kit_startRotation" | safeJS }}":"{{ i18n "kit_stopRotation" | safeJS }}");
     rot.firstChild.textContent=s?"▶":"❚❚";
     live.setAttribute("aria-live",s?"polite":"off");
   }

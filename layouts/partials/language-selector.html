@@ -1,0 +1,42 @@
+{{- /*
+language-selector.html: the language combo of the top bar, as the Hextra
+documentation has one: a button with the current language's name, and a menu
+of every language, each in its own name, each linking to the SAME page in that
+language when it has one, else to that language's home. A site with one
+language gets nothing (no bytes), which is what keeps the kit's other landings
+as they were. theme-toggle.html calls it, so a landing needs no change: it
+declares its languages in hugo.toml and writes a page per language.
+
+The sheet is in i18n-head.html (called by styles.html, in <head>); the markup
+is a disclosure: the button toggles the menu, Escape and a click outside close
+it, the arrow keys move in it.
+*/ -}}
+{{- if hugo.IsMultilingual -}}
+{{- $page := . -}}
+<div class="lang" data-lang-selector><button type="button" class="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="{{ i18n "kit_language" | safeHTML }}"><span aria-hidden="true">🌐</span><span class="lang-cur">{{ partial "language-label.html" site.Language }}</span></button><ul id="lang-menu" class="lang-menu" role="menu" hidden>
+{{- range hugo.Sites -}}
+{{- $l := .Language -}}
+{{- $href := .Home.RelPermalink -}}
+{{- range $page.AllTranslations }}{{ if eq .Language.Lang $l.Lang }}{{ $href = .RelPermalink }}{{ end }}{{ end -}}
+<li role="none"><a role="menuitem" href="{{ $href }}" lang="{{ partial "html-lang.html" $l }}" hreflang="{{ partial "html-lang.html" $l }}"{{ if eq $l.Lang site.Language.Lang }} aria-current="true"{{ end }}>{{ partial "language-label.html" $l }}</a></li>
+{{- end -}}
+</ul></div>
+<script>
+(function(){
+  var box=document.querySelector("[data-lang-selector]");if(!box)return;
+  var b=box.querySelector("button"),m=box.querySelector("ul");
+  function close(f){m.hidden=true;b.setAttribute("aria-expanded","false");if(f)b.focus();}
+  function open(){m.hidden=false;b.setAttribute("aria-expanded","true");var a=m.querySelector("[aria-current]")||m.querySelector("a");if(a)a.focus();}
+  b.addEventListener("click",function(){if(m.hidden)open();else close(true);});
+  document.addEventListener("click",function(e){if(!box.contains(e.target))close(false);});
+  box.addEventListener("keydown",function(e){
+    if(m.hidden)return;
+    if(e.key==="Escape"){close(true);e.preventDefault();}
+    else if(e.key==="ArrowDown"||e.key==="ArrowUp"){
+      var as=[].slice.call(m.querySelectorAll("a")),i=as.indexOf(document.activeElement);
+      as[(i+(e.key==="ArrowDown"?1:-1)+as.length)%as.length].focus();e.preventDefault();
+    }
+  });
+})();
+</script>
+{{- end -}}

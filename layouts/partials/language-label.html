@@ -1,0 +1,9 @@
+{{- /*
+language-label.html: the language's name in its own language ("Français",
+"日本語"), from the site's config (label, or languageName before Hugo 0.158).
+Called with a Language.
+*/ -}}
+{{- $l := . -}}
+{{- $label := "" -}}
+{{- if ge hugo.Version "0.158.0" -}}{{- $label = $l.Label -}}{{- else -}}{{- $label = $l.LanguageName -}}{{- end -}}
+{{- $label | default $l.Lang -}}

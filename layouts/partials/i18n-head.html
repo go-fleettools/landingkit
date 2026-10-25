@@ -1,0 +1,13 @@
+{{- /*
+i18n-head.html: the hreflang alternates of a MULTILINGUAL site's page (and
+x-default, the first language by weight), called by styles.html so that a
+landing adds nothing. It prints nothing at all on a site with one language, so
+such a site's page is the one it had, byte for byte. The language selector's
+sheet is i18n-style.html.
+*/ -}}
+{{- if hugo.IsMultilingual -}}
+{{- range $i, $t := .AllTranslations -}}
+{{- if eq $i 0 }}<link rel="alternate" hreflang="x-default" href="{{ $t.Permalink }}">{{ end -}}
+<link rel="alternate" hreflang="{{ partial "html-lang.html" $t.Language }}" href="{{ $t.Permalink }}">
+{{- end -}}
+{{- end -}}

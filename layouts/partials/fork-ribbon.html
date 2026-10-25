@@ -2,4 +2,4 @@
      with the brand gradient instead of the original PNGs, so it follows the
      theme. It replaces the nav bar's GitHub button. Called with the
      repository URL: {{ partial "fork-ribbon.html" "https://github.com/o/r" }} */}}
-<div class="fork-ribbon"><a href="{{ . }}" aria-label="Fork me on GitHub">Fork me on GitHub</a></div>
+<div class="fork-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_forkMe" | safeHTML }}">{{ i18n "kit_forkMe" | safeHTML }}</a></div>

@@ -1,0 +1,12 @@
+{{- /*
+html-lang.html: the language's locale as a BCP 47 tag, for lang= and hreflang=
+(zh-Hans, not zh: a browser picks the glyph variants of the Han characters
+shared by Chinese and Japanese from lang). Called with a Language:
+<html lang="{{ partial "html-lang.html" site.Language }}">. A language with
+no locale in the site's config gives its key ("en", "fr"). Hugo 0.158 renamed
+LanguageCode to Locale.
+*/ -}}
+{{- $l := . -}}
+{{- $locale := "" -}}
+{{- if ge hugo.Version "0.158.0" -}}{{- $locale = $l.Locale -}}{{- else -}}{{- $locale = $l.LanguageCode -}}{{- end -}}
+{{- $locale | default $l.Lang -}}

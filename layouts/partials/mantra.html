@@ -10,5 +10,5 @@ phone can put the data chips under the code's.
 */ -}}
 {{- if partial "mantra-on.html" . -}}
 {{- $items := partial "mantra-items.html" . -}}
-<div class="mantra" role="note" aria-label="Licence and build of this organisation's code"><span class="mantra-row">{{ range first 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ if gt (len $items) 2 }}<span class="mantra-row">{{ range after 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ end }}</div>
+<div class="mantra" role="note" {{ printf `aria-label="%s"` (i18n "kit_mantra") | safeHTMLAttr }}><span class="mantra-row">{{ range first 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ if gt (len $items) 2 }}<span class="mantra-row">{{ range after 2 $items }}<code class="mantra-chip">{{ . }}</code>{{ end }}</span>{{ end }}</div>
 {{- end -}}
