@@ -13,6 +13,9 @@ it lists cards. Cards come from the page's `hero.cards`, else the site's
   [[params.hero.cards]]
     terminal = true                       # the landing's hero-terminal.html
   [[params.hero.cards]]
+    terminal = "ruby"                     # a second terminal: hero-terminal-ruby.html
+    title = "Ruby cells"                  # the card's name for assistive technology
+  [[params.hero.cards]]
     img = "/img/hero/editor.png"          # with its intrinsic size: no layout shift
     width = 1200
     height = 750
@@ -79,7 +82,15 @@ them into one cell, a layout shift. */}}
     {{- range $i, $c := $cards }}
     <div class="hero-car-card{{ if not $i }} on{{ end }}" role="group" aria-roledescription="slide" aria-label="{{ i18n "kit_nOfM" (dict "n" (add $i 1) "m" $n) | safeHTML }}{{ with $c.title }}: {{ . }}{{ else }}{{ with $c.caption }}: {{ . }}{{ end }}{{ end }}"{{ if $i }} aria-hidden="true"{{ end }}>
       {{- if $c.terminal }}
-      {{ partial "hero-terminal.html" $page }}
+      {{- /* terminal = true is the landing's hero-terminal.html; terminal = "ruby"
+           is its hero-terminal-ruby.html, a second terminal of its own. The
+           name is checked: it picks a template, so it is a word, not a path. */}}
+      {{- $term := "hero-terminal.html" }}
+      {{- if eq (printf "%T" $c.terminal) "string" }}
+      {{- if findRE `^[a-z0-9]+(-[a-z0-9]+)*$` $c.terminal }}{{ $term = printf "hero-terminal-%s.html" $c.terminal }}
+      {{- else }}{{ errorf "hero card terminal = %q: a terminal's name is lower-case letters, digits and single hyphens (it selects hero-terminal-<name>.html)" $c.terminal }}{{ end }}
+      {{- end }}
+      {{ partial $term $page }}
       {{- else if $c.img }}
       <figure class="hero-car-fig">
         {{- $img := printf `src="%s"` $c.img }}{{ if $i }}{{ $img = printf `data-src="%s"` $c.img }}{{ end }}

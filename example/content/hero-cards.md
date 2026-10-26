@@ -6,6 +6,8 @@ hero:
   cards:
     - terminal: true
       title: "The brand, from the logo"
+    - terminal: "verify"
+      title: "A second terminal"
     - img: "/carousel/2.svg"
       width: 320
       height: 180
