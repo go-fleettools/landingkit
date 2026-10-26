@@ -444,6 +444,29 @@ Only the `<style>` block and the background. A landing whose `index.html`
 differs -- a longer headline, an extra band -- passes; that is what
 [landingdiff](https://github.com/go-fleettools/landingdiff) counts. Use both.
 
+## Saying it once: `landingkit check` (v0.13.0)
+
+```sh
+landingkit check public
+```
+
+The mantra strip already says the licence and `CGO_ENABLED=0`. A landing that
+also hard-codes them in its footer or in its hero sub-text (`<p class="sub">`)
+shows every fact twice. `check` reads the BUILT site, finds the chips (the
+strip's generated content, or the `mantra-chip` markup of earlier versions),
+and exits 1 for each page whose footer or hero sub-text repeats a chip, its
+licence value, or "Pure Go" when the strip carries `CGO_ENABLED=0`. A page
+without the strip is not checked: its own mention is then the only one. The fix
+is the pattern of `example/layouts/index.html`:
+
+```go-html-template
+{{ if not (partial "mantra-on.html" .) }}BSD-3-Clause · CGO_ENABLED=0{{ end }}
+```
+
+The heading is not checked: "in pure Go" in an `h1` is the project's identity,
+not the strip's fact. Add it to the landing's links workflow, next to
+`landingkit links public`.
+
 ## No partial ends with a newline
 
 A partial is pasted where it is called, and its final newline comes with it.
