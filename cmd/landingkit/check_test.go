@@ -82,6 +82,17 @@ func TestCheckSeesMarkupChips(t *testing.T) {
 	}
 }
 
+// A page that cannot be read is an error, never a pass.
+func TestCheckUnreadablePage(t *testing.T) {
+	d := t.TempDir()
+	if err := os.Symlink(filepath.Join(d, "absent"), filepath.Join(d, "dangling.html")); err != nil {
+		t.Skip(err)
+	}
+	if code, msg := runCheck(t, d); code != 1 || !strings.Contains(msg, "landingkit check:") {
+		t.Fatalf("exit %d: %s", code, msg)
+	}
+}
+
 func TestCheckUsage(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run([]string{"check"}, &out, &errb); code != 2 {
