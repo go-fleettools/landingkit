@@ -132,6 +132,10 @@ jobs:
           done
           echo "the loading carousel reached its page"
           page="$RUNNER_TEMP/example/index.html"
+          # A page Hugo does not build (a playground written by a Go program)
+          # renders it with landingkit.LoadingCarousel: the page Hugo built
+          # holds that output, and testdata's golden file, byte for byte.
+          LANDINGKIT_HUGO_PAGE="$RUNNER_TEMP/example/carousel/index.html" go test -count=1 -v -run '^TestLoadingCarouselIsHugos$' .
           # the chips are TEXT nodes (v0.7.0), never CSS generated content
           for want in '<code class="mantra-chip">LICENSE=BSD-3-Clause</code>' '<code class="mantra-chip">CGO_ENABLED=0</code>'; do
             grep -qF -- "$want" "$page" || { echo "::error::the mantra chip $want is not text in the page"; exit 1; }

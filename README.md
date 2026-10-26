@@ -21,7 +21,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
-| `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
+| `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground); `landingkit.LoadingCarousel` renders the same file for a page Hugo does not build (v0.12.0) |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
@@ -228,6 +228,31 @@ landingkitCarousel.done(reveal, onWait);  // ready: reveal() shows the page
 - **Nothing is fetched unless it shows**: the pictures are lazy, and only
   the next card's is preloaded. `landingkitCarousel.state` exposes `shown`,
   `downloaded`, `advanced` and `startShown` for a test.
+
+### On a page Hugo does not build (v0.12.0)
+
+A playground page written by a Go program cannot call a partial.
+`landingkit.LoadingCarousel` executes **the same partial file** with Go's
+`html/template` and the few Hugo functions it calls (`default`, `add`,
+`dict`, `i18n`, `safeHTML`, `safeJS`), so there is one carousel, not a copy:
+
+```go
+html, err := landingkit.LoadingCarousel(landingkit.Carousel{
+	Cards:    []landingkit.Card{{Title: "Cells", Text: "…", Href: "https://…"}},
+	Pictures: "cards/", Ext: ".svg", Suffix: "?v=" + version,
+	Label:    "What go-notebook does", Start: "Open the notebook",
+	Fade:     "loading",
+	Lang:     "en", // the kit's words, from i18n/<lang>.yaml
+})
+```
+
+A zero field takes the partial's default, as an absent key does in Hugo. The
+page supplies the variables `styles.html` defines (`--line`, `--bg-soft`,
+`--ink`, `--slate`, `--accent`) and calls `downloaded()` and `done()` as
+above. `testdata/loading-carousel.golden.html` is the Go rendering of
+`example/`'s cards, and CI's hugo job checks that the page Hugo builds from
+them holds it **byte for byte** (`TestLoadingCarouselIsHugos`).
+go-notebook/playground's `cmd/build` uses it.
 
 `example/carousel/` uses it with a pretend download (`?cached=1` for a
 cached one). go-slides.github.io's playground uses it, and

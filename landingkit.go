@@ -9,8 +9,9 @@
 //
 // and Hugo mounts layouts/partials/ under the site's own, so
 // {{ partial "styles.html" . }} resolves to this module's copy unless the site
-// overrides it. The partials are the design; this Go package exists for two
-// smaller reasons:
+// overrides it. The partials are the design. LoadingCarousel renders the
+// loading carousel's partial for a page a Go program writes; besides it,
+// this Go package exists for two smaller reasons:
 //
 //   - `landingkit verify` masks the sheet's own cyan defaults, and it reads
 //     them from the sheet it was built with rather than from a copy;
