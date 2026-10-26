@@ -176,6 +176,18 @@ jobs:
           grep -qF 'aria-roledescription="carousel"' "$RUNNER_TEMP/example/hero-cards/index.html" \
             || { echo "::error::the page with cards has no carousel"; exit 1; }
           echo "hero-nocards is hero-plain, byte for byte; hero-cards is a carousel"
+      # terminal = "verify" is the landing's hero-terminal-verify.html; a name
+      # that is not a plain word (it selects a template) fails the build.
+      - name: a named terminal card, and a bad name refused
+        run: |
+          grep -qF 'a second terminal card: hero-terminal-verify.html' "$RUNNER_TEMP/example/hero-cards/index.html" \
+            || { echo "::error::the named terminal card is not on the page"; exit 1; }
+          printf -- '---\ntitle: "Bad"\nlayout: hero\nhero:\n  cards:\n    - terminal: true\n    - terminal: "../verify"\n---\n' > example/content/hero-bad.md
+          if (cd example && hugo --destination "$RUNNER_TEMP/hero-bad"); then
+            echo "::error::a terminal named ../verify built"; exit 1
+          fi
+          rm example/content/hero-bad.md
+          echo "a named terminal reaches its card; a path is refused"
       # And an organisation that turns the mantra off gets the page the kit
       # built before the mantra existed, byte for byte: the base branch's
       # example, built with its own kit, against this one with

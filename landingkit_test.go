@@ -119,6 +119,9 @@ func TestHeroCarousel(t *testing.T) {
 		`data-src`, `fetchpriority="high"`, // later pictures wait; the first may be the LCP
 		`addEventListener("load"`, // the next one after the page has loaded
 		`aria-hidden="true"`,      // hidden cards are hidden from assistive technology
+		// terminal = "name" is hero-terminal-name.html, the name a plain word
+		"{{ $term = printf \"hero-terminal-%s.html\" $c.terminal }}",
+		"findRE `^[a-z0-9]+(-[a-z0-9]+)*$` $c.terminal",
 	})
 	if strings.Index(p, `class="hero-car-rot"`) > strings.Index(p, `class="hero-car-slides"`) {
 		t.Error("the rotation button is not the first element of the region")

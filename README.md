@@ -24,7 +24,7 @@ Renovate proposes the bump.
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
-| `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
+| `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
 | `i18n/<lang>.yaml` | the words the partials write (labels, aria-labels, "Read more"…), in English, French, German, Spanish, Simplified Chinese, Korean and Japanese (v0.8.0) |
 | `layouts/partials/btn-try-style.html` | opt-in: the red `btn btn-try` button (white text, hover and focus states); a site that does not call it is unchanged (v0.9.0) |
 | `layouts/partials/language-selector.html` | the language combo of the top bar; nothing on a site with one language (v0.8.0) |
@@ -256,6 +256,9 @@ come from the page's `hero.cards`, else from the site's:
 [[params.hero.cards]]
   terminal = true                     # the landing's hero-terminal.html
 [[params.hero.cards]]
+  terminal = "ruby"                   # a second terminal: hero-terminal-ruby.html (v0.11.0)
+  title = "Ruby cells"                # the card's name for assistive technology
+[[params.hero.cards]]
   img = "/img/hero/editor.png"        # with its intrinsic size
   width = 1200
   height = 750
@@ -269,6 +272,13 @@ come from the page's `hero.cards`, else from the site's:
   more = "Install"                    # the link's text (default "Read more")
 ```
 
+- **More than one terminal (v0.11.0).** `terminal = "<name>"` renders the
+  landing's `layouts/partials/hero-terminal-<name>.html`, so a second example
+  is a real terminal, its text selectable and searchable, rather than a
+  picture of one (go-notebook.github.io shows a notebook with Ruby cells and
+  what it printed). The name selects a template, so it must be lower-case
+  letters, digits and single hyphens; anything else (`../x`) fails the build.
+  `terminal = true` is unchanged, byte for byte.
 - **No layout shift.** Every card sits in the same grid cell, so the hero
   takes its tallest card's size from the first paint.
 - **LCP no worse.**
