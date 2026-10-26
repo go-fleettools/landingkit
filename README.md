@@ -19,6 +19,7 @@ Renovate proposes the bump.
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
+| `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground) |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
@@ -345,7 +346,9 @@ does both checks.
 A call to action that must stand out ("Try it in your browser"). It is opt-in:
 call `{{ partial "btn-try-style.html" . }}` after `styles.html` (a second
 `<style>`, so `landingkit verify` still reads the kit's sheet first) and give
-the link `class="btn btn-try"`. A site that does not call it renders as it did.
+the link `class="btn btn-try"`, with the icon, as the documentation button has
+its book: `<a class="btn btn-try" href="…">{{ partial "icons/browser.html" . }}Try it in your browser</a>`
+(decorative, `aria-hidden`; v0.10.0). A site that does not call it renders as it did.
 
 Red `#dc2626`, white text 4.83:1; hover `#c52222`, 5.79:1; keyboard focus a
 2px outline in `--ink`, offset 2px, at least 3:1 against the page and the
