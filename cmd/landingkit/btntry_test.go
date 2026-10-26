@@ -115,3 +115,33 @@ func TestBtnTryIsOptIn(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+// An icon is decoration: the button's text names it. Every icon partial is
+// aria-hidden, not focusable, 16 px and drawn in currentColor, so it takes the
+// text's colour, and so its contrast (white on btn-try's red).
+func TestIconsAreDecorative(t *testing.T) {
+	files, err := filepath.Glob("../../layouts/partials/icons/*.html")
+	if err != nil || len(files) < 3 {
+		t.Fatalf("icons: %v, %v", files, err)
+	}
+	var sawBrowser bool
+	for _, f := range files {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		s := string(b)
+		for _, want := range []string{`aria-hidden="true"`, `focusable="false"`, `fill="currentColor"`, `width="16"`, `class="icon"`} {
+			if !strings.Contains(s, want) {
+				t.Errorf("%s lacks %s", f, want)
+			}
+		}
+		if strings.Contains(s, "<title") {
+			t.Errorf("%s has a <title>: a decorative icon is not named", f)
+		}
+		sawBrowser = sawBrowser || filepath.Base(f) == "browser.html"
+	}
+	if !sawBrowser {
+		t.Error("icons/browser.html is missing")
+	}
+}
