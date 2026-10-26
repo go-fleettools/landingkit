@@ -25,6 +25,7 @@ Renovate proposes the bump.
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte |
 | `i18n/<lang>.yaml` | the words the partials write (labels, aria-labels, "Read more"…), in English, French, German, Spanish, Simplified Chinese, Korean and Japanese (v0.8.0) |
+| `layouts/partials/btn-try-style.html` | opt-in: the red `btn btn-try` button (white text, hover and focus states); a site that does not call it is unchanged (v0.9.0) |
 | `layouts/partials/language-selector.html` | the language combo of the top bar; nothing on a site with one language (v0.8.0) |
 | `layouts/partials/i18n-head.html`, `i18n-style.html` | the hreflang alternates, and the selector's and the CJK languages' sheet, a second `<style>`; nothing on a site with one language (v0.8.0) |
 | `layouts/partials/html-lang.html`, `language-label.html` | a Language's locale (`zh-Hans`) for `lang=`, and its name in its own language (v0.8.0) |
@@ -338,6 +339,18 @@ Only claim what is true. Before turning the strip on, check the
 organisation's licences (`gh api repos/O/R/license`) and its cgo use.
 `go run github.com/go-fleettools/fleettools/cmd/mantracheck@latest <org>`
 does both checks.
+
+## The red button: `btn-try` (v0.9.0)
+
+A call to action that must stand out ("Try it in your browser"). It is opt-in:
+call `{{ partial "btn-try-style.html" . }}` after `styles.html` (a second
+`<style>`, so `landingkit verify` still reads the kit's sheet first) and give
+the link `class="btn btn-try"`. A site that does not call it renders as it did.
+
+Red `#dc2626`, white text 4.83:1; hover `#c52222`, 5.79:1; keyboard focus a
+2px outline in `--ink`, offset 2px, at least 3:1 against the page and the
+button in both themes. `TestBtnTryContrast` computes all of these from the
+sheet and `TestBtnTryIsOptIn` keeps the variant out of every other partial.
 
 ## Languages (v0.8.0)
 
