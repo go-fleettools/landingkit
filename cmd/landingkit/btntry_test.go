@@ -106,6 +106,14 @@ func TestBtnTryIsOptIn(t *testing.T) {
 		if err != nil {
 			return err
 		}
+		if filepath.Base(p) == "cta.html" {
+			// The row renders the button's MARKUP when a site lists a "try"
+			// item; it carries no rule for it, which stays in btn-try-style.html.
+			if strings.Contains(string(b), "<style") {
+				t.Errorf("%s carries a stylesheet: the variant's rules must stay in btn-try-style.html", p)
+			}
+			return nil
+		}
 		if strings.Contains(string(b), "btn-try") {
 			t.Errorf("%s mentions btn-try: the variant must stay in its own partial", p)
 		}

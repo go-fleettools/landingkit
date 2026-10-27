@@ -93,6 +93,72 @@ func TestCheckUnreadablePage(t *testing.T) {
 	}
 }
 
+// A hero whose call-to-action row is `row`, on a page that otherwise passes.
+func ctaPage(row string) string {
+	return strings.Replace(page(`A gateway.`, `<footer><div class=wrap><span>© the authors</span></div></footer>`),
+		`</section>`, row+`</section>`, 1)
+}
+
+// The planted positive, from the defect that prompted the rule: go-wasmcontainers'
+// hero had the red "Try it" button before the blue documentation button.
+func TestCheckFailsTryBeforeDocs(t *testing.T) {
+	d := checkSite(t, ctaPage(`<div class=cta><a class="btn btn-try" href=/playground/>Try it in your browser</a><a class="btn btn-primary" href=/docs/>Read the documentation</a></div>`))
+	code, msg := runCheck(t, d)
+	if code != 1 {
+		t.Fatalf("exit %d, want 1: %s", code, msg)
+	}
+	for _, want := range []string{`hero call-to-action "btn-primary" comes after "btn-try"`, `{{ partial "cta.html" . }}`} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("missing %q in:\n%s", want, msg)
+		}
+	}
+}
+
+// A ghost button before the docs one is out of order too, and so is one before
+// the red one; a single-class attribute is unquoted in minified output.
+func TestCheckFailsGhostBeforePrimaryAndTry(t *testing.T) {
+	for name, row := range map[string]string{
+		"ghost then primary": `<div class="cta"><a class=btn-ghost href=/src/>Source</a><a class="btn btn-primary" href=/docs/>Docs</a></div>`,
+		"ghost then try":     `<div class="cta wide"><a class="btn btn-ghost" href=/src/>Source</a><a class="btn btn-try" href=/pg/>Try</a></div>`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if code, msg := runCheck(t, checkSite(t, ctaPage(row))); code != 1 || !strings.Contains(msg, "comes after") {
+				t.Fatalf("exit %d: %s", code, msg)
+			}
+		})
+	}
+}
+
+// The conforming rows: docs, try, then the rest; a lone button; links that are
+// not kit buttons anywhere in the row; and a page with no row at all.
+func TestCheckPassesRowsInTheKitsOrder(t *testing.T) {
+	for name, row := range map[string]string{
+		"docs, try, ghost": `<div class=cta><a class="btn btn-primary" href=/docs/>Docs</a><a class="btn btn-try" href=/pg/>Try</a><a class=btn-ghost href=/src/>Source</a><a class="btn btn-ghost" href=/x/>More</a></div>`,
+		"a lone button":    `<div class="cta"><a class="btn btn-primary" href=/docs/>Docs</a></div>`,
+		"plain links":      `<div class=cta><a class="btn btn-ghost" href=/src/>Source</a><a class=other href=/o/>Other</a><a href=/n/>No class</a><a class=btn href=/b/>Bare</a></div>`,
+		"no row":           `<p>nothing</p>`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if code, msg := runCheck(t, checkSite(t, ctaPage(row))); code != 0 {
+				t.Fatalf("exit %d: %s", code, msg)
+			}
+		})
+	}
+}
+
+// The success line counts the rows it read, so a check that read none cannot
+// pass for one that read them all.
+func TestCheckCountsTheRows(t *testing.T) {
+	d := checkSite(t, ctaPage(`<div class=cta><a class="btn btn-primary" href=/docs/>Docs</a></div>`))
+	if code, msg := runCheck(t, d); code != 0 || !strings.Contains(msg, "1 hero call-to-action row(s)") {
+		t.Fatalf("exit %d: %s", code, msg)
+	}
+	d = checkSite(t, ctaPage(`<p>none</p>`))
+	if code, msg := runCheck(t, d); code != 0 || !strings.Contains(msg, "0 hero call-to-action row(s)") {
+		t.Fatalf("exit %d: %s", code, msg)
+	}
+}
+
 func TestCheckUsage(t *testing.T) {
 	var out, errb bytes.Buffer
 	if code := run([]string{"check"}, &out, &errb); code != 2 {

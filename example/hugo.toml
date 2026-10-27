@@ -6,6 +6,29 @@ baseURL = 'https://example.invalid/'
 title   = 'landingkit example'
 disableKinds = ['taxonomy', 'term', 'rss', 'sitemap', '404']
 
+# The hero's buttons, listed here in the WRONG order on purpose: partial
+# "cta.html" renders them in the kit's (docs, try, github, link), and CI runs
+# `landingkit check` on the built page.
+[[params.cta]]
+  kind  = "link"
+  href  = "https://github.com/go-fleettools/landingkit/blob/main/README.md#importing-it-in-a-landing"
+  label = "Importing it"
+
+[[params.cta]]
+  kind  = "github"
+  href  = "https://github.com/go-fleettools/landingkit"
+  label = "Source"
+
+[[params.cta]]
+  kind  = "try"
+  href  = "https://github.com/go-fleettools/landingkit/tree/main/example"
+  label = "Try it"
+
+[[params.cta]]
+  kind  = "docs"
+  href  = "https://github.com/go-fleettools/landingkit#readme"
+  label = "Read the documentation"
+
 [module]
   [[module.imports]]
     path = "github.com/go-fleettools/landingkit"

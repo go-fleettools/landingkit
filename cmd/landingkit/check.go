@@ -110,12 +110,63 @@ func firstOf(ms [][]string) []string {
 	return out
 }
 
+// `check` also fails a hero whose call-to-action row is out of the kit's order.
+//
+// The row is the `.cta` block under the title. The kit's order is the docs
+// button first (`btn-primary`, the blue one), then the red `btn-try` ("Try it
+// in your browser"), then the plain `btn-ghost` ones (README, "The hero's
+// call-to-action row"; cta.html renders it in that order whatever order the
+// site lists its buttons in). A landing that writes the row by hand can put
+// them anywhere, and did: go-wasmcontainers' had the red button first. The
+// check reads the BUILT page, so it judges a hand-written row and the
+// partial's output alike.
+var (
+	ctaRowRE = regexp.MustCompile(`(?s)<div\b[^>]*\bclass=(?:"[^"]*\bcta\b[^"]*"|cta\b)[^>]*>(.*?)</div>`)
+	ctaBtnRE = regexp.MustCompile(`<a\b[^>]*\bclass=(?:"([^"]*)"|([^\s>"]+))[^>]*>`)
+)
+
+// ctaRank is a button's place in the row, from its classes; -1 for a link the
+// order says nothing about.
+func ctaRank(classes string) (int, string) {
+	for _, f := range strings.Fields(classes) {
+		switch f {
+		case "btn-primary":
+			return 0, f
+		case "btn-try":
+			return 1, f
+		case "btn-ghost":
+			return 2, f
+		}
+	}
+	return -1, ""
+}
+
+// ctaDisorder lists the buttons of a page's hero rows that come after one the
+// kit puts later, and counts the rows it read.
+func ctaDisorder(page string) (disorder []string, rows int) {
+	for _, row := range ctaRowRE.FindAllStringSubmatch(page, -1) {
+		rows++
+		last, lastName := -1, ""
+		for _, b := range ctaBtnRE.FindAllStringSubmatch(row[1], -1) {
+			rank, name := ctaRank(b[1] + " " + b[2])
+			switch {
+			case rank < 0:
+			case rank < last:
+				disorder = append(disorder, fmt.Sprintf("hero call-to-action %q comes after %q", name, lastName))
+			default:
+				last, lastName = rank, name
+			}
+		}
+	}
+	return disorder, rows
+}
+
 func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	if len(args) != 1 {
 		fmt.Fprint(stderr, "usage: landingkit check <built-site-dir>\n")
 		return 2
 	}
-	bad, seen := 0, 0
+	bad, seen, rows := 0, 0, 0
 	err := filepath.WalkDir(args[0], func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(p) != ".html" {
 			return err
@@ -132,6 +183,12 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "%s: %s, which the mantra strip already says; wrap it in {{ if not (partial \"mantra-on.html\" .) }}\n", p, r)
 			bad++
 		}
+		order, n := ctaDisorder(page)
+		rows += n
+		for _, o := range order {
+			fmt.Fprintf(stderr, "%s: %s; the kit's order is docs (btn-primary), try (btn-try), then the rest: list them in [[params.cta]] and render the row with {{ partial \"cta.html\" . }}\n", p, o)
+			bad++
+		}
 		return nil
 	})
 	if err != nil {
@@ -141,6 +198,6 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	if bad > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "check: %d page(s) with the mantra strip, nothing said twice\n", seen)
+	fmt.Fprintf(stdout, "check: %d page(s) with the mantra strip, nothing said twice; %d hero call-to-action row(s) in the kit's order\n", seen, rows)
 	return 0
 }

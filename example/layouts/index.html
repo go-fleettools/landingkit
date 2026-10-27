@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ .Site.Title }}</title>
 {{ partial "styles.html" . }}
+{{ partial "btn-try-style.html" . }}
 </head>
 <body class="lm">
 <header class="nav"><div class="wrap nav-in">
@@ -15,11 +16,8 @@
 <main>
   <section class="hero"><div class="wrap">
     <h1 class="head">One stylesheet</h1>
-    <div class="cta">
-      <a class="btn btn-primary" href="https://github.com/go-fleettools/landingkit#readme">{{ partial "icons/book.html" . }} Read the documentation</a>
-      <a class="btn btn-ghost" href="https://github.com/go-fleettools/landingkit">{{ partial "icons/github.html" . }} Source</a>
-      <a class="btn btn-ghost" href="https://github.com/go-fleettools/landingkit/blob/main/README.md#importing-it-in-a-landing">Importing it</a>
-    </div>
+    {{/* the row is the kit's: [[params.cta]] in hugo.toml, in any order, comes out docs, try, github, link */}}
+    {{ partial "cta.html" . }}
   </div></section>
   <section style="height:2400px"></section>
 </main>

@@ -27,6 +27,7 @@ Renovate proposes the bump.
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
 | `i18n/<lang>.yaml` | the words the partials write (labels, aria-labels, "Read more"…), in English, French, German, Spanish, Simplified Chinese, Korean and Japanese (v0.8.0) |
 | `layouts/partials/btn-try-style.html` | opt-in: the red `btn btn-try` button (white text, hover and focus states); a site that does not call it is unchanged (v0.9.0) |
+| `layouts/partials/cta.html` | the hero's call-to-action row, rendered from `[[params.cta]]` (`kind` = docs, try, github or link) in the kit's order: docs, try, then the rest (v0.14.0) |
 | `layouts/partials/language-selector.html` | the language combo of the top bar; nothing on a site with one language (v0.8.0) |
 | `layouts/partials/i18n-head.html`, `i18n-style.html` | the hreflang alternates, and the selector's and the CJK languages' sheet, a second `<style>`; nothing on a site with one language (v0.8.0) |
 | `layouts/partials/html-lang.html`, `language-label.html` | a Language's locale (`zh-Hans`) for `lang=`, and its name in its own language (v0.8.0) |
@@ -389,6 +390,38 @@ Red `#dc2626`, white text 4.83:1; hover `#c52222`, 5.79:1; keyboard focus a
 2px outline in `--ink`, offset 2px, at least 3:1 against the page and the
 button in both themes. `TestBtnTryContrast` computes all of these from the
 sheet and `TestBtnTryIsOptIn` keeps the variant out of every other partial.
+
+## The hero's call-to-action row: the kit's order (v0.14.0)
+
+The two coloured buttons under the title are the documentation button (the
+primary, blue `btn-primary`) and, where there is a playground, the red
+`btn-try`. **The kit's order is: docs, then try, then the plain `btn-ghost`
+links.** go-slides.github.io (`layouts/index.html`, the docs button above the
+`btn-try` one) and `example/` already followed it; nothing wrote it down, and
+go-wasmcontainers' landing had the red button first.
+
+It is enforced twice:
+
+- **The kit renders the row.** List the buttons in `[[params.cta]]`, in any
+  order, and put `{{ partial "cta.html" . }}` where the row goes:
+
+  ```toml
+  [[params.cta]]
+    kind  = "docs"      # docs | try | github | link
+    href  = "https://example.github.io/docs/"
+    label = "Read the documentation →"
+  ```
+
+  It comes out `docs`, `try`, `github`, `link`, whatever the order of the list;
+  an unknown `kind`, or a button without `href` and `label`, fails the build.
+  The words are the site's (params are per language). A `try` button still
+  needs `{{ partial "btn-try-style.html" . }}` after `styles.html`.
+- **`landingkit check` reads the built page.** For a landing that writes its
+  row by hand, it fails when a `btn-primary` comes after a `btn-try` or a
+  `btn-ghost`, or a `btn-try` after a `btn-ghost`, in a `.cta` row. The
+  success line says how many rows it read. `TestCheckFailsTryBeforeDocs` plants
+  the old go-wasmcontainers row and must fail; the rows in the kit's order must
+  pass.
 
 ## Languages (v0.8.0)
 
