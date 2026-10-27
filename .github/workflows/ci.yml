@@ -281,6 +281,14 @@ jobs:
           "$RUNNER_TEMP/landingkit" links "$RUNNER_TEMP/example" | tee "$RUNNER_TEMP/links.log"
           grep -q '(via https://raw.githubusercontent.com/go-fleettools/landingkit/' "$RUNNER_TEMP/links.log" \
             || { echo "::error::the blob link was not probed on the raw host"; exit 1; }
+      # The example lists its buttons in the WRONG order in hugo.toml; the
+      # kit's cta.html must put them right, and `check` must see that it did
+      # (it counts the rows it read: one).
+      - name: the hero's buttons are in the kit's order
+        run: |
+          "$RUNNER_TEMP/landingkit" check "$RUNNER_TEMP/example" | tee "$RUNNER_TEMP/check.log"
+          grep -q '1 hero call-to-action row(s) in the kit' "$RUNNER_TEMP/check.log" \
+            || { echo "::error::check did not read the example's hero row"; exit 1; }
       - name: verify against itself (must pass)
         run: |
           "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \

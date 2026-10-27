@@ -133,6 +133,20 @@ func TestHeroCarousel(t *testing.T) {
 	}
 }
 
+// The hero's row keeps its contract: the kit's order is written ONCE, in the
+// range, and docs comes before try, which comes before the rest; a bad kind or
+// a button without words stops the build instead of rendering a wrong row.
+func TestCtaRowOrder(t *testing.T) {
+	p := contract(t, "layouts/partials/cta.html", []string{
+		`range $kind := slice "docs" "try" "github" "link"`, // the order
+		`errorf "cta: unknown kind`, `errorf "cta %q: href and label are both required"`,
+		`btn btn-primary`, `btn btn-try`, `btn btn-ghost`,
+	})
+	if strings.Index(p, `btn btn-primary" href`) > strings.Index(p, `btn btn-try" href`) {
+		t.Error("cta.html renders the red button before the docs button")
+	}
+}
+
 // The strip says the licence and CGO_ENABLED=0; nothing else the kit renders
 // says them again. Only styles.html (the strip) and mantra-on.html (the
 // question it asks) may hold them: a partial that printed them would repeat

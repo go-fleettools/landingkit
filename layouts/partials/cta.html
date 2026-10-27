@@ -1,0 +1,37 @@
+{{- /* The hero's call-to-action row, rendered from [[params.cta]] in an order the
+     KIT decides, not the site's markup: docs (the primary, blue button), then try
+     (the red btn-try), then github, then any plain link. A site lists its buttons
+     in any order; they come out in this one. `landingkit check` fails a built page
+     whose .cta row is out of it, for a site that writes the row by hand.
+
+       [[params.cta]]
+         kind  = "docs"      # docs | try | github | link
+         href  = "https://example.github.io/docs/"
+         label = "Read the documentation →"
+
+     The words are the site's (params are per language), so a site in several
+     languages translates them where it translates everything else. A "try" button
+     needs {{ partial "btn-try-style.html" . }} in the <head>, after styles.html. */ -}}
+{{- $ctx := . -}}
+{{- $items := $ctx.Site.Params.cta -}}
+{{- if $items -}}
+<div class="cta">
+{{- range $kind := slice "docs" "try" "github" "link" -}}
+{{- range $items -}}
+{{- if not (in (slice "docs" "try" "github" "link") .kind) -}}{{ errorf "cta: unknown kind %q, want docs, try, github or link" .kind }}{{- end -}}
+{{- if and (eq .kind $kind) (not (and .href .label)) -}}{{ errorf "cta %q: href and label are both required" .kind }}{{- end -}}
+{{- if eq .kind $kind -}}
+{{- if eq $kind "docs" }}
+  <a class="btn btn-primary" href="{{ .href }}">{{ partial "icons/book.html" $ctx }}{{ .label }}</a>
+{{- else if eq $kind "try" }}
+  <a class="btn btn-try" href="{{ .href }}">{{ partial "icons/browser.html" $ctx }}{{ .label }}</a>
+{{- else if eq $kind "github" }}
+  <a class="btn btn-ghost" href="{{ .href }}">{{ partial "icons/github.html" $ctx }}{{ .label }}</a>
+{{- else }}
+  <a class="btn btn-ghost" href="{{ .href }}">{{ .label }}</a>
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+</div>
+{{- end -}}
