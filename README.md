@@ -26,6 +26,7 @@ Renovate proposes the bump.
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
 | `i18n/<lang>.yaml` | the words the partials write (labels, aria-labels, "Read more"…), in English, French, German, Spanish, Italian, Polish, Brazilian Portuguese, Russian, Ukrainian, Simplified Chinese, Korean and Japanese (v0.8.0; Italian to Ukrainian in v0.15.0) |
+| `layouts/partials/inline-code-style.html` | opt-in: inline `code` (not `pre`) is one unbreakable unit (an inline-block that wraps inside itself only when wider than the line): a browser breaks after a hyphen, so `---` could end a line as "–" and begin the next as "––"; call it after `styles.html`; a site that does not is unchanged (v0.16.0) |
 | `layouts/partials/btn-try-style.html` | opt-in: the red `btn btn-try` button (white text, hover and focus states); a site that does not call it is unchanged (v0.9.0) |
 | `layouts/partials/cta.html` | the hero's call-to-action row, rendered from `[[params.cta]]` (`kind` = docs, try, github or link) in the kit's order: docs, try, then the rest (v0.14.0) |
 | `layouts/partials/language-selector.html` | the language combo of the top bar; nothing on a site with one language (v0.8.0) |
