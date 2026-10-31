@@ -21,6 +21,8 @@ Renovate proposes the bump.
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
+| `layouts/partials/icons/graph.html` | a rising line graph (Octicons "graph", MIT) for a "Benchmarks" button (v0.17.0) |
+| `layouts/partials/icons/rocket.html` | a rocket (Octicons "rocket", MIT) for a "Quickstart" or "Get started" button (v0.17.0) |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground); `landingkit.LoadingCarousel` renders the same file for a page Hugo does not build (v0.12.0) |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
