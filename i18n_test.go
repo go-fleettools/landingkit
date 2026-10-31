@@ -10,7 +10,7 @@ import (
 )
 
 // kitLanguages are the languages the kit ships strings for besides English.
-var kitLanguages = []string{"fr", "de", "es", "zh", "ko", "ja"}
+var kitLanguages = []string{"fr", "de", "es", "it", "pl", "pt", "ru", "uk", "zh", "ko", "ja"}
 
 var yamlLine = regexp.MustCompile(`^(kit_[A-Za-z]+): "(.*)"$`)
 
