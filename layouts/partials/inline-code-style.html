@@ -1,0 +1,8 @@
+<style>
+/* Inline code is an unbreakable unit: a browser may break a line after a
+   hyphen, so `---` ended a line as "–" and began the next as "––". As an
+   inline-block it stays whole; max-width and overflow-wrap let a token longer
+   than the line wrap inside its own box instead of pushing a phone's page
+   wide. Code in a pre is untouched. */
+:not(pre)>code{display:inline-block;max-width:100%;white-space:normal;overflow-wrap:anywhere;vertical-align:baseline}
+</style>

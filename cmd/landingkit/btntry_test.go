@@ -153,3 +153,36 @@ func TestIconsAreDecorative(t *testing.T) {
 		t.Error("icons/browser.html is missing")
 	}
 }
+
+// inline-code-style.html is opt-in like btn-try: its rule is in no other
+// partial, so a site that does not call it is byte for byte what it was.
+func TestInlineCodeStyleIsOptInAndKeepsInlineCodeWhole(t *testing.T) {
+	b, err := os.ReadFile("../../layouts/partials/inline-code-style.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{":not(pre)>code{", "display:inline-block", "max-width:100%", "overflow-wrap:anywhere"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("inline-code-style.html lacks %q", want)
+		}
+	}
+	if strings.HasSuffix(string(b), "\n") {
+		t.Error("a partial must not end with a newline")
+	}
+	err = filepath.Walk("../../layouts", func(p string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || filepath.Base(p) == "inline-code-style.html" {
+			return err
+		}
+		c, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(c), ":not(pre)>code") {
+			t.Errorf("%s carries the inline-code rule: it must stay in its own partial", p)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
