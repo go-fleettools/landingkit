@@ -132,6 +132,14 @@ func TestLoadingCarouselOptions(t *testing.T) {
 			t.Errorf("the French carousel lacks %q", w)
 		}
 	}
+	// signal mode: the section says so; without it, it does not
+	sig, err := LoadingCarousel(Carousel{Cards: []Card{{Title: "x"}}, Signal: true})
+	if err != nil || !strings.Contains(string(sig), ` hidden data-signal="1" data-delay="300"`) {
+		t.Errorf("signal: %v\n%s", err, sig)
+	}
+	if plain, _ := LoadingCarousel(Carousel{Cards: []Card{{Title: "x"}}}); strings.Contains(string(plain), ` data-signal="1"`) {
+		t.Error("the default carousel carries data-signal")
+	}
 	// no cards, nothing
 	if got, err := LoadingCarousel(Carousel{}); err != nil || got != "" {
 		t.Errorf("no cards: %q, %v", got, err)

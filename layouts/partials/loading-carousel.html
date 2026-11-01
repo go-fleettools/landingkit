@@ -10,7 +10,8 @@ See the README ("The loading carousel").
        "suffix"   "?v=abc" "ext" ".jpg"
        "label"    "What go-slides does"
        "start"    "Start the playground"
-       "fade"     "pg-placeholder") }}       // the element faded away (default: the carousel)
+       "fade"     "pg-placeholder"            // the element faded away (default: the carousel)
+       "signal"   true) }}                    // optional: count the delay from landingkitCarousel.downloading()
 
 The page's loader then calls landingkitCarousel.downloaded() when the large
 download is over, and landingkitCarousel.done(reveal, onWait) when it is
@@ -53,7 +54,7 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
 .lk-car-fading{opacity:0!important;pointer-events:none;transition:opacity .35s ease}
 @media (prefers-reduced-motion:reduce){.lk-car-card.enter{animation:none}.lk-car-fading{transition:none}}
 </style>
-<section id="{{ $id }}" class="lk-car" role="region" aria-roledescription="carousel" aria-label="{{ $.label | default (i18n "kit_carouselLabel") }}" hidden data-delay="{{ $.delay | default 300 }}" data-every="{{ $.every | default 4500 }}" data-idle="{{ $.idle | default 6000 }}" data-fade="{{ $.fade | default $id }}">
+<section id="{{ $id }}" class="lk-car" role="region" aria-roledescription="carousel" aria-label="{{ $.label | default (i18n "kit_carouselLabel") }}" hidden{{ if $.signal }} data-signal="1"{{ end }} data-delay="{{ $.delay | default 300 }}" data-every="{{ $.every | default 4500 }}" data-idle="{{ $.idle | default 6000 }}" data-fade="{{ $.fade | default $id }}">
   <button type="button" class="lk-car-rot" id="{{ $id }}-rot" aria-label="{{ i18n "kit_stopRotation" | safeHTML }}"><span aria-hidden="true">❚❚</span></button>
   <div class="lk-car-slides" id="{{ $id }}-slides" aria-live="off" aria-atomic="false">
     {{- range $i, $c := . }}
@@ -77,8 +78,8 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
 "use strict";
 (function(){
   var box=document.getElementById({{ $id }}),start=document.getElementById({{ $id }}+"-start");
-  var st={shown:false,done:false,downloaded:false,advanced:0,startShown:false};
-  var api={state:st,downloaded:function(){st.downloaded=true;},done:function(reveal){reveal();}};
+  var st={shown:false,done:false,downloaded:false,downloading:false,advanced:0,startShown:false};
+  var api={state:st,downloading:function(){},downloaded:function(){st.downloaded=true;},done:function(reveal){reveal();}};
   window.landingkitCarousel=api;
   if(!box)return;
   var num=function(k,d){var v=parseInt(box.getAttribute("data-"+k),10);return isNaN(v)?d:v;};
@@ -115,12 +116,24 @@ button restarts); prefers-reduced-motion: no rotation, no animation.
   box.addEventListener("focusin",function(e){if(e.target!==rot&&!stopped)setStopped(true);touched=Date.now();});
   function engaged(){return hover||box.contains(document.activeElement)||Date.now()-touched<IDLE;}
   // shown only while the large download is still going after DELAY: a
-  // cached one is over at once, whatever its compile then takes
-  var later=setTimeout(function(){
-    if(st.done||st.downloaded)return;
-    st.shown=true;box.hidden=false;preload(1);
-    timer=setInterval(function(){if(!stopped&&!hover)show(i+1,true);},EVERY);
-  },DELAY);
+  // cached one is over at once, whatever its compile then takes. By default
+  // the wait is counted from the page's script. With "signal" it is counted
+  // from downloading(), which the page calls when the bytes really are coming
+  // over the network: a module that is cached, or a runtime that is merely
+  // slow to start, never calls it and never shows the carousel, however long
+  // it takes.
+  var SIGNAL=box.getAttribute("data-signal")==="1",later=0,armed=false;
+  function arm(){
+    if(armed||st.done||st.downloaded)return;
+    armed=true;
+    later=setTimeout(function(){
+      if(st.done||st.downloaded)return;
+      st.shown=true;box.hidden=false;preload(1);
+      timer=setInterval(function(){if(!stopped&&!hover)show(i+1,true);},EVERY);
+    },DELAY);
+  }
+  api.downloading=function(){st.downloading=true;if(SIGNAL)arm();};
+  if(!SIGNAL)arm();
   api.done=function(reveal,onWait){
     st.done=true;clearTimeout(later);
     if(!st.shown){reveal();return;}

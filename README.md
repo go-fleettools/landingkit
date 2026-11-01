@@ -219,6 +219,19 @@ landingkitCarousel.done(reveal, onWait);  // ready: reveal() shows the page
   cached module is downloaded at once, so it never flashes the carousel,
   whatever its compile then takes. Measuring elapsed time instead flashed it
   on a slow CI runner.
+- **`"signal" true` (v0.18.0): counted from the download, not from the
+  page's script.** The delay above is counted from the script, so a runtime
+  that is merely slow to start (a worker booting on a loaded runner, reading
+  a cached 30 MB module) can pass 300 ms before it has said `downloaded()`,
+  and flashes the carousel for a download that never happened. go-notebook's
+  playground did, on CI. With `signal`, the carousel waits for
+  `landingkitCarousel.downloading()`, which the page calls when the bytes
+  really are coming over the network (a cache probe missed), and counts the
+  300 ms from there. A cached module never calls it, and never shows the
+  carousel, however slow the machine. A page that does not set `signal` is
+  unchanged, and `downloading()` is then a no-op, so a loader may call it
+  anyway. `state.downloading` exposes it for a test. In Go,
+  `Carousel{Signal: true}`.
 - **WAI-ARIA APG carousel pattern:**
   - a labelled region, the rotation button first;
   - slides as labelled groups;
