@@ -50,8 +50,8 @@
 "use strict";
 (function(){
   var box=document.getElementById("lk-carousel"),start=document.getElementById("lk-carousel"+"-start");
-  var st={shown:false,done:false,downloaded:false,advanced:0,startShown:false};
-  var api={state:st,downloaded:function(){st.downloaded=true;},done:function(reveal){reveal();}};
+  var st={shown:false,done:false,downloaded:false,downloading:false,advanced:0,startShown:false};
+  var api={state:st,downloading:function(){},downloaded:function(){st.downloaded=true;},done:function(reveal){reveal();}};
   window.landingkitCarousel=api;
   if(!box)return;
   var num=function(k,d){var v=parseInt(box.getAttribute("data-"+k),10);return isNaN(v)?d:v;};
@@ -89,11 +89,23 @@
   function engaged(){return hover||box.contains(document.activeElement)||Date.now()-touched<IDLE;}
   
   
-  var later=setTimeout(function(){
-    if(st.done||st.downloaded)return;
-    st.shown=true;box.hidden=false;preload(1);
-    timer=setInterval(function(){if(!stopped&&!hover)show(i+1,true);},EVERY);
-  },DELAY);
+  
+  
+  
+  
+  
+  var SIGNAL=box.getAttribute("data-signal")==="1",later=0,armed=false;
+  function arm(){
+    if(armed||st.done||st.downloaded)return;
+    armed=true;
+    later=setTimeout(function(){
+      if(st.done||st.downloaded)return;
+      st.shown=true;box.hidden=false;preload(1);
+      timer=setInterval(function(){if(!stopped&&!hover)show(i+1,true);},EVERY);
+    },DELAY);
+  }
+  api.downloading=function(){st.downloading=true;if(SIGNAL)arm();};
+  if(!SIGNAL)arm();
   api.done=function(reveal,onWait){
     st.done=true;clearTimeout(later);
     if(!st.shown){reveal();return;}

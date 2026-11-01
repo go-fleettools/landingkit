@@ -89,6 +89,10 @@ func TestLoadingCarousel(t *testing.T) {
 		`if(st.done||st.downloaded)return;`, // the cached-load skip
 		`window.landingkitCarousel=api`,     // the page's API
 		`downloaded:function`, `api.done=function(reveal,onWait)`,
+		// signal mode: the delay counts from downloading(), never from the
+		// script, so a cached module or a slow runtime cannot flash the carousel
+		`api.downloading=function(){st.downloading=true;if(SIGNAL)arm();};`, `if(!SIGNAL)arm();`,
+		`{{ if $.signal }} data-signal="1"{{ end }}`,
 		`loading="lazy"`, `im.loading="eager"`, // nothing fetched unless shown; the next one preloaded
 	})
 	// The rotation button is the region's first control.

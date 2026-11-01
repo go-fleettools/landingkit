@@ -17,7 +17,7 @@
          into the "app" when it is over (or waits with Start for a reader in
          it). ?cached=1 pretends the download was cached: no carousel. */}}
     <div id="loading">
-      {{ partial "loading-carousel.html" (dict "cards" site.Data.carousel_cards "pictures" "/carousel/" "ext" ".svg" "label" "What landingkit does" "start" "Show the page" "fade" "loading") }}
+      {{ partial "loading-carousel.html" (dict "cards" site.Data.carousel_cards "pictures" "/carousel/" "ext" ".svg" "label" "What landingkit does" "start" "Show the page" "fade" "loading" "signal" .Params.signal) }}
       <p id="msg">Loading…</p>
     </div>
     <div id="app" hidden><h1 class="head">Loaded</h1></div>
@@ -28,6 +28,9 @@
 (function(){
   var cached=/[?&]cached=1/.test(location.search);
   var reveal=function(){document.getElementById("loading").hidden=true;document.getElementById("app").hidden=false;};
+  // with "signal" (?signal page), the carousel counts its delay from here:
+  // a download over the network starts; a cached one never says so
+  if(!cached)landingkitCarousel.downloading();
   setTimeout(function(){
     landingkitCarousel.downloaded();
     landingkitCarousel.done(reveal,function(){document.getElementById("msg").textContent="Ready.";});

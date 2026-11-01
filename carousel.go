@@ -62,6 +62,13 @@ type Carousel struct {
 	// (default 300 ms); Every the rotation's period (4500 ms); Idle how long
 	// after a click the reader counts as in the carousel (6000 ms).
 	Delay, Every, Idle int
+	// Signal counts Delay from the page's call to
+	// landingkitCarousel.downloading(), made when the bytes really are
+	// coming over the network, rather than from the page's script. A module
+	// that is cached, or a runtime that is merely slow to start, never calls
+	// it, and never shows the carousel. Without it, the carousel shows when
+	// downloaded() has not been called Delay after the script ran.
+	Signal bool
 	// Lang is the language of the kit's words, one of i18n/<lang>.yaml
 	// (default "en").
 	Lang string
@@ -94,7 +101,7 @@ func LoadingCarousel(c Carousel) (template.HTML, error) {
 	for k, v := range map[string]any{
 		"id": c.ID, "pictures": c.Pictures, "ext": c.Ext, "suffix": c.Suffix,
 		"label": c.Label, "start": c.Start, "fade": c.Fade, "more": c.More,
-		"width": c.Width, "height": c.Height, "delay": c.Delay, "every": c.Every, "idle": c.Idle,
+		"width": c.Width, "height": c.Height, "delay": c.Delay, "every": c.Every, "idle": c.Idle, "signal": c.Signal,
 	} {
 		if !reflect.ValueOf(v).IsZero() {
 			dict[k] = v
