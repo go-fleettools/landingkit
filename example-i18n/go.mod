@@ -2,7 +2,7 @@ module github.com/go-fleettools/landingkit/example-i18n
 
 go 1.27.3
 
-require github.com/go-fleettools/landingkit v0.14.0
+require github.com/go-fleettools/landingkit v0.18.0
 
 // Built against the checkout, as example/ is.
 replace github.com/go-fleettools/landingkit => ../
