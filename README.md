@@ -160,6 +160,24 @@ A landing generated before v0.19.0 has no `accent` or `accentDark`, and the
 sheet falls back to the raw stop, so it keeps what it has until it regenerates
 its block.
 
+### Measuring a pair of colours
+
+`brand` measures the two pairs the kit itself uses. A landing that is **not** on
+the kit still has text on a background, and those are the pages nobody can
+check, so those are the pages that drift:
+
+```
+$ landingkit contrast '#0b1418' '#4f46e5' '#6366f1'
+#4f46e5 on #0b1418  2.96:1  under
+#6366f1 on #0b1418  4.17:1  under (large text only)
+```
+
+Exit 0 when every foreground clears 4.5:1, 1 when one does not, 2 on a colour
+it cannot read. The maths is the one `brand` and the sheet's tests already use,
+exported rather than copied -- a second implementation is a second answer, and
+recomputing a ratio by hand is how this fleet once recorded 3.61 where the
+number was 3.77.
+
 `statsEnd` and `bandText` were the last cyan literals in the rules (`#cdf1fa`,
 `#d8f3fb`). The sheet keeps those as their defaults, so a site without
 `[params.brand]` renders the same `<style>` block as before -- checked by
