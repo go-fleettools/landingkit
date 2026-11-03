@@ -25,6 +25,15 @@
 {{ $base   := $br.base   | default "#0079A8" }}
 {{ $deep   := $br.deep   | default "#054A66" }}
 {{ $bright := $br.bright | default "#22CCE2" }}
+{{- /* The TEXT accents, which are the two gradient stops moved only as far as
+     4.5:1 asks (WCAG 2.2 SC 1.4.3) and not at all when the stop already clears
+     it — see cmd/landingkit/brand.go. A logo is exempt from the rule and the
+     text painted in its colour is not: go-widgets' teal was 3.74:1 on white and
+     the document family's indigo 3.07:1 on the dark background, both shipped.
+     The defaults are the raw stops, so a landing built before these keys
+     existed renders exactly what it rendered. */}}
+{{- $accent     := $br.accent     | default $base }}
+{{- $accentDark := $br.accentDark | default $bright }}
 {{ $shadow := $br.shadow | default "rgba(0,121,168,.7)" }}
 {{- /* Three more that were written into the RULES rather than taken as
      parameters, so every org using this sheet glowed cyan whatever its logo
@@ -59,7 +68,7 @@
     --cyan:{{ $base | safeCSS }}; --cyan-deep:{{ $deep | safeCSS }};
     --grad:linear-gradient(135deg,{{ $base | safeCSS }},{{ $deep | safeCSS }});
     /* interactive / text accent (brightens in dark for contrast) */
-    --accent:{{ $base | safeCSS }}; --accent-deep:{{ $deep | safeCSS }};
+    --accent:{{ $accent | safeCSS }}; --accent-deep:{{ $deep | safeCSS }};
     /* the gradient TEXT is painted with (the hero's accent line): --grad
        carries white text on buttons and bands, this one is text itself, so
        it has its own value per theme. Contrast is tested (cmd/landingkit
@@ -81,7 +90,7 @@
   /* Dark theme — applied by the media query for un-forced "system", and by an explicit toggle. */
   @media(prefers-color-scheme:dark){
     :root:not([data-theme]){
-      --accent:{{ $bright | safeCSS }}; --accent-deep:{{ $bright | safeCSS }};
+      --accent:{{ $accentDark | safeCSS }}; --accent-deep:{{ $accentDark | safeCSS }};
       --grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},{{ $chipFgD | safeCSS }});
       --ink:#e6edf3; --slate:#9aa4b2; --muted-2:#7d8798;
       --line:#232a36; --bg:#0b0e14; --bg-soft:#111620;
@@ -94,7 +103,7 @@
     }
   }
   :root[data-theme="dark"]{
-    --accent:{{ $bright | safeCSS }}; --accent-deep:{{ $bright | safeCSS }};
+    --accent:{{ $accentDark | safeCSS }}; --accent-deep:{{ $accentDark | safeCSS }};
     --grad-text:linear-gradient(135deg,{{ $chipFgD | safeCSS }},{{ $chipFgD | safeCSS }});
     --ink:#e6edf3; --slate:#9aa4b2; --muted-2:#7d8798;
     --line:#232a36; --bg:#0b0e14; --bg-soft:#111620;

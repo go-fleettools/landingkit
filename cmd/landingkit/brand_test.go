@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -47,8 +48,12 @@ func TestBrandIsByteEqualToKitPy(t *testing.T) {
 			t.Errorf("%s:\n got:\n%s\nwant (kit.py):\n%s", logo, got, want)
 		}
 		bright := goldenBright(t, want)
-		if wantAdded := fmt.Sprintf("\"%s\"\n  bandText = \"%s\"\n", exactMix(bright, 24), exactMix(bright, 16)); added != wantAdded {
-			t.Errorf("%s: the v0.3.0 keys:\n got: statsEnd = %s\nwant: statsEnd = %s", logo, added, wantAdded)
+		wantAdded := fmt.Sprintf("\"%s\"\n  bandText = \"%s\"\n  accent = \"%s\"\n  accentDark = \"%s\"\n",
+			exactMix(bright, 24), exactMix(bright, 16),
+			fittedAccent(t, want, "base", "#ffffff", "#000000"),
+			fittedAccent(t, want, "bright", "#"+darkBg, "#ffffff"))
+		if added != wantAdded {
+			t.Errorf("%s: the appended keys:\n got: statsEnd = %s\nwant: statsEnd = %s", logo, added, wantAdded)
 		}
 	}
 }
@@ -152,6 +157,80 @@ func goldenBright(t *testing.T, golden []byte) [3]int64 {
 		c[i] = v
 	}
 	return c
+}
+
+// fittedAccent is the reference for the accent keys: the stop named key, as
+// kit.py printed it, moved toward away in 4 % steps until it clears 4.5:1 on
+// bg — and unmoved when it already does.
+//
+// It shares no code with derive(). The mix is INTEGER arithmetic: a 4 % step is
+// k/25, so a channel is (c*(25-k) + away*k)/25, whose remainder out of 25 can
+// never be an exact half — which is the property the 4 % step was chosen for,
+// here demonstrated rather than asserted. The luminance is written out from
+// WCAG 2.2's own formula instead of calling brand.go's.
+func fittedAccent(t *testing.T, golden []byte, key, bg, away string) string {
+	t.Helper()
+	c, g, a := goldenHex(t, golden, key), parseHex(t, bg), parseHex(t, away)
+	lum := func(c [3]int64) float64 {
+		var l float64
+		for i, w := range [3]float64{0.2126, 0.7152, 0.0722} {
+			v := float64(c[i]) / 255
+			if v <= 0.03928 {
+				v /= 12.92
+			} else {
+				v = math.Pow((v+0.055)/1.055, 2.4)
+			}
+			l += w * v
+		}
+		return l
+	}
+	ratio := func(x, y [3]int64) float64 {
+		hi, lo := lum(x), lum(y)
+		if lo > hi {
+			hi, lo = lo, hi
+		}
+		return (hi + 0.05) / (lo + 0.05)
+	}
+	for k := int64(0); k < 25; k++ {
+		var m [3]int64
+		for i := range m {
+			num := c[i]*(25-k) + a[i]*k
+			q, r := num/25, num%25
+			if r*2 > 25 {
+				q++
+			}
+			m[i] = q
+		}
+		if ratio(m, g) >= 4.5 {
+			return fmt.Sprintf("#%02x%02x%02x", m[0], m[1], m[2])
+		}
+	}
+	return away
+}
+
+func parseHex(t *testing.T, h string) [3]int64 {
+	t.Helper()
+	h = strings.TrimPrefix(h, "#")
+	var c [3]int64
+	for i := range c {
+		v, err := strconv.ParseInt(h[2*i:2*i+2], 16, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		c[i] = v
+	}
+	return c
+}
+
+// goldenHex is the colour kit.py printed for key, so the reference starts from
+// kit.py's reading of the logo and not from stops().
+func goldenHex(t *testing.T, golden []byte, key string) [3]int64 {
+	t.Helper()
+	m := regexp.MustCompile(`\n  ` + key + ` = "(#[0-9a-f]{6})"\n`).FindSubmatch(golden)
+	if m == nil {
+		t.Fatalf("no %s in\n%s", key, golden)
+	}
+	return parseHex(t, string(m[1]))
 }
 
 // exactMix is bright mixed into white at pct %, in integer arithmetic: the
