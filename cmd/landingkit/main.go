@@ -22,6 +22,7 @@ const usage = `usage:
   landingkit verify [flags] <site> <ref>      the <style> block and the page background against the reference
   landingkit links  [flags] <built-site-dir>   every http(s) link in the built site resolves
   landingkit check  <built-site-dir>           fails when the footer or hero sub-text repeats what the mantra strip says, or the hero's buttons are out of the kit's order (docs, try, rest)
+  landingkit contrast <background> <fg>...     the WCAG 2.2 ratio of each foreground on that background
 
 run 'landingkit verify -h' for the verify flags
 `
@@ -45,6 +46,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdLinks(args[1:], stdout, stderr)
 	case "check":
 		return cmdCheck(args[1:], stdout, stderr)
+	case "contrast":
+		return cmdContrast(args[1:], stdout, stderr)
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
