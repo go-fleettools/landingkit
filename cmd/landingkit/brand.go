@@ -113,9 +113,57 @@ func stops(svg []byte) (light, dark rgb, ok bool) {
 
 type entry struct{ key, value string }
 
+// ⛔ A LOGO IS EXEMPT FROM THE CONTRAST RULE AND THE TEXT PAINTED IN ITS COLOUR
+// IS NOT. WCAG 2.2 SC 1.4.3 says so in as many words — "text that is part of a
+// logo or brand name has no contrast requirement" — and the accent paints
+// .eyebrow (13px/800), .backlink (14px/700) and a benchmark cell, none of them
+// large scale (18pt, or 14pt bold = 18.66px), so the bar is the full 4.5:1.
+//
+// Reading the colour from the logo is what makes these landings one family, and
+// it is also how a gradient stop that was never meant to carry text came to:
+// go-widgets' teal on white at 3.74:1, the document family's indigo on the dark
+// background at 3.07:1. Both shipped. The generator printed the second one in
+// the brand's own comment and printed the brand anyway.
+//
+// So the accent is the stop MOVED ONLY AS FAR AS THE BAR ASKS — toward black on
+// white, toward white on the dark background — and is the stop itself whenever
+// the stop already clears it. Every brand that passes is untouched, which is
+// what keeps the README's byte-identity check meaningful and keeps a hundred
+// landings looking as they do.
+const (
+	minContrast = 4.5
+	// darkBg is the sheet's dark --bg. The light one is white.
+	darkBg = "0b0e14"
+	// fitStep is 4 %, for the reason statsEndT and bandTextT are multiples of
+	// 4 %: no channel can land on an exact .5, so the rounding mode cannot
+	// change the colour and a reviewer recomputing it by hand agrees.
+	fitStep = 0.04
+)
+
+// fit moves c toward away in steps of fitStep until it clears minContrast
+// against bg, and returns c unmoved when it already does.
+//
+// The last step is away itself, and there is no "could not" branch to write
+// because there is no background both white and black fail against: failing
+// both would need the background's luminance to be above 1.05/minContrast−0.05
+// and below minContrast×0.05−0.05 at once, and for 4.5 that is above 0.183 and
+// below 0.175. A guard for it would be a statement no test could reach.
+func fit(c, bg, away rgb) rgb {
+	m := c
+	for k := range 1 + int(1/fitStep) { // 0 %, 4 %, … 100 %
+		m = mix(c, away, float64(k)*fitStep)
+		if contrast(m, bg) >= minContrast {
+			break
+		}
+	}
+	return m
+}
+
 func derive(light, dark rgb) (b []entry, onWhite, onDark float64) {
 	base, bright := dark, light
 	deep := mix(base, rgb{}, 0.39)
+	accent := fit(base, white, rgb{})
+	accentDark := fit(bright, hexRGB(darkBg), white)
 	b = []entry{
 		{"base", rgbHex(base)}, {"deep", rgbHex(deep)}, {"bright", rgbHex(bright)},
 		{"shadow", rgba(base, ".7")}, {"glow", rgba(base, ".6")},
@@ -128,8 +176,14 @@ func derive(light, dark rgb) (b []entry, onWhite, onDark float64) {
 		// Not from kit.py: added in v0.3.0, see the comment on statsEndT.
 		{"statsEnd", rgbHex(mix(white, bright, statsEndT))},
 		{"bandText", rgbHex(mix(white, bright, bandTextT))},
+		// Nor these, added for the contrast rule above. Appended rather than
+		// put beside base and bright on purpose: everything kit.py printed is
+		// still printed in kit.py's order, so TestBrandIsByteEqualToKitPy keeps
+		// comparing against an oracle this change cannot have moved.
+		{"accent", rgbHex(accent)},
+		{"accentDark", rgbHex(accentDark)},
 	}
-	return b, contrast(base, white), contrast(bright, hexRGB("0b0e14"))
+	return b, contrast(base, white), contrast(bright, hexRGB(darkBg))
 }
 
 func brandTOML(b []entry, onWhite, onDark float64, logo string) string {

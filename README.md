@@ -112,8 +112,8 @@ one (by WCAG relative luminance) is `bright`, the darker one is `base`.
 
 | key | rule |
 |:--|:--|
-| `base` | the gradient's DARK stop: it carries text and links on white |
-| `bright` | the gradient's LIGHT stop: the accent in dark mode |
+| `base` | the gradient's DARK stop: the brand colour on white, and what every tint below is built from |
+| `bright` | the gradient's LIGHT stop: the brand colour in dark mode |
 | `deep` | `base` darkened by 39 % |
 | `shadow`, `glow`, `wash` | `base` at alpha .7, .6, .10 |
 | `washDeep` | `deep` at .06 |
@@ -122,9 +122,43 @@ one (by WCAG relative luminance) is `bright`, the darker one is `base`.
 | `chipBgDark`, `chipBorderDark` | `bright` at .14 and .32 |
 | `chipFgDark` | `bright` mixed with 45 % white |
 | `statsEnd`, `bandText` | `bright` mixed into white at 24 % and 16 %: the stats figures' gradient end and the CTA band's paragraph (v0.3.0) |
+| `accent` | `base` moved toward black until it reaches 4.5:1 on white, and not at all if it is already there |
+| `accentDark` | `bright` moved toward white until it reaches 4.5:1 on `#0b0e14`, same rule |
 
 The block also records both contrast ratios, so a logo whose dark stop is too
 light to carry text on white is visible in the diff that introduces it.
+
+### The accents: a logo is exempt from the contrast rule, the text in its colour is not
+
+`--accent` paints `.eyebrow` (13px, weight 800), `.backlink` (14px, weight 700)
+and a benchmark cell. None of them is large-scale text under WCAG 2.2 (18pt, or
+14pt bold = 18.66px), so SC 1.4.3 asks the full **4.5:1** -- and the exemption
+it grants to "text that is part of a logo or brand name" does not reach text
+merely painted in the logo's colour.
+
+Until v0.19.0 the accent *was* the stop, as read. Two brands failed, and the
+generator had been printing one of the two numbers all along:
+
+| brand | theme | was | is |
+|:--|:--|--:|--:|
+| go-widgets teal `#0d9488` | light | **3.74:1** | 4.69:1 |
+| the document family's indigo `#4f46e5` | dark | **3.07:1** | 4.61:1 |
+
+So the accent is the stop **moved only as far as the bar asks**, in steps of
+4 % -- the same step `statsEnd` and `bandText` use, for the same reason: a
+channel is `(c·(25−k) + away·k)/25`, whose remainder out of 25 can never be an
+exact half, so the rounding mode cannot change the colour. A stop that already
+clears the bar is not moved at all, so **every brand that passed renders
+exactly what it rendered**: `example/` builds byte-identical across this change.
+
+`TestAccentContrast` holds the sheet itself to the bar, resolved against every
+brand `landingkit brand` prints today -- not against the `.toml` goldens, which
+are kit.py's output and have no accent keys. There was a contrast test before
+this one, for the gradient text alone; a flat colour on flat text had none.
+
+A landing generated before v0.19.0 has no `accent` or `accentDark`, and the
+sheet falls back to the raw stop, so it keeps what it has until it regenerates
+its block.
 
 `statsEnd` and `bandText` were the last cyan literals in the rules (`#cdf1fa`,
 `#d8f3fb`). The sheet keeps those as their defaults, so a site without
