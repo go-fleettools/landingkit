@@ -491,6 +491,24 @@ It is enforced twice:
   the old go-wasmcontainers row and must fail; the rows in the kit's order must
   pass.
 
+### Only the kit writes the row (v0.21.0)
+
+The order did not keep the landings alike. go-numerics and go-ndarray wrote
+their rows by hand, in the right order, and both put "Try it in the browser"
+in a ghost button instead of the red `btn-try`, one of them without its icon.
+So `landingkit check` now also fails:
+
+- a `.cta` row without `data-kit-cta`, the mark `cta.html` writes on its row:
+  **a row written by hand is refused**, whatever it contains;
+- in any row, a link whose address contains `playground` that is not `btn-try`;
+- a `btn-primary` or `btn-try` button without its icon (an `<svg>`).
+
+Each message names the fix: `[[params.cta]]` and `{{ partial "cta.html" . }}`.
+`TestCheckFailsARowTheKitDidNotRender` plants the five shapes of the defect; with
+the new check removed, all five pass, which is how the test is known to bite.
+This is a breaking change for a landing that writes its row by hand and runs
+`check`: it goes red on the version bump, with the fix in the message.
+
 ## Languages (v0.8.0)
 
 A landing in one language is **exactly the page it was**: the words the
