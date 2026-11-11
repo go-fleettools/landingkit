@@ -215,6 +215,18 @@ func TestMantra(t *testing.T) {
 		`<code class="mantra-chip">{{ . }}</code>`, // text, escaped by Hugo
 		`range first 2 $items`, `range after 2 $items`,
 	})
+	contract(t, "layouts/partials/mantra-goarch.html", []string{
+		`isset $mt "goarch"`,
+		`errorf "landingkit: [params.mantra] goarch %q is not a GOARCH Go knows`,
+		`errorf "landingkit: [params.mantra] goarch %q is listed twice"`,
+		`return $arch`,
+	})
+	contract(t, "layouts/partials/mantra.html", []string{
+		`$arch := partial "mantra-goarch.html" .`,
+		`{{ if $arch }}<span class="mantra-arch">`, // nothing at all without goarch
+		`{{ i18n "kit_goarch" }}`,
+		`<code class="mantra-chip mantra-goarch">{{ . }}</code>`,
+	})
 	contract(t, "layouts/partials/theme-toggle.html", []string{`{{ partial "mantra.html" . }}`})
 	s := contract(t, "layouts/partials/styles.html", []string{
 		`$show := partial "mantra-on.html" .`, // one answer, shared with the landings

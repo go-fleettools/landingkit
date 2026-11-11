@@ -167,6 +167,25 @@ jobs:
             echo "::error::five items built"; exit 1
           fi
           echo "four chips reach the page; five are refused"
+      # [params.mantra] goarch (v0.22.0): the line of architectures reaches the
+      # page with its label and grows the bar by a row; an unknown GOARCH and a
+      # repeated one are refused at build time. (Unset, the example above is
+      # unchanged: the base-branch byte comparisons cover it.)
+      - name: the architectures line, and bad architectures refused
+        run: |
+          printf '[params.mantra]\n  goarch = ["amd64", "arm64", "riscv64"]\n' > "$RUNNER_TEMP/goarch.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/goarch.toml" --destination "$RUNNER_TEMP/goarch")
+          page="$RUNNER_TEMP/goarch/index.html"
+          for want in '<span class="mantra-arch-label">Tested on</span>' '<code class="mantra-chip mantra-goarch">riscv64</code>' '.nav{padding-bottom:63px}'; do
+            grep -qF -- "$want" "$page" || { echo "::error::$want is not in the page"; exit 1; }
+          done
+          for bad in '["amd64", "x86_64"]' '["amd64", "amd64"]'; do
+            printf '[params.mantra]\n  goarch = %s\n' "$bad" > "$RUNNER_TEMP/goarch-bad.toml"
+            if (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/goarch-bad.toml" --destination "$RUNNER_TEMP/goarch-bad"); then
+              echo "::error::goarch = $bad built"; exit 1
+            fi
+          done
+          echo "the line reaches the page; an unknown and a repeated GOARCH are refused"
       # A landing's own mention of the licence shows only without the strip:
       # mantra-on.html answers for both.
       - name: the landing's own licence line, only without the strip

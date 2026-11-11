@@ -184,6 +184,19 @@
   {{- /* the column's left edge: the .wrap's padding, inside a 1120px column */}}
   {{- $left := "max(24px,calc(50% - 536px))" }}
   .nav{padding-bottom:34px}
+  {{- /* [params.mantra] goarch (v0.22.0): the architectures the tests run on,
+       a line of their own under the chips, so the bar grows by one row of
+       29px (two on a phone, where six names wrap). Unset, nothing here is
+       emitted and the sheet is the one before. */}}
+  {{- $arch := partial "mantra-goarch.html" . }}
+  {{- if $arch }}
+  .nav{padding-bottom:63px}
+  {{- /* the strip is absolutely placed: without a right edge it is as wide
+       as its content and the line of names runs off a phone's screen */}}
+  .mantra{flex-wrap:wrap;row-gap:7px;right:{{ $left | safeCSS }}}
+  .mantra-arch{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+  .mantra-arch-label{font:600 11px/22px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:var(--muted-2);text-transform:uppercase;letter-spacing:.06em}
+  {{- end }}
   .mantra{position:absolute;top:69px;left:{{ $left | safeCSS }};display:flex;gap:8px;align-items:flex-start}
   .mantra-row{display:flex;gap:8px}
   .mantra-chip{display:block;height:22px;padding:0 9px;border:1px solid var(--chip-border);border-radius:7px;
@@ -198,7 +211,17 @@
   {{- $extra := sub (len $items) 2 }}
   @media(max-width:{{ add 144 (add (mul 8 $wAll) (mul 28 (len $items))) }}px){
     .nav{padding-bottom:{{ add 34 (mul 29 $extra) }}px}
+    {{- if $arch }}
+    .nav{padding-bottom:{{ add 63 (mul 29 $extra) }}px}
+    {{- end }}
     .mantra,.mantra-row+.mantra-row{flex-direction:column;gap:7px}
+  }
+  {{- end }}
+  {{- if $arch }}
+  {{- $dataRows := 0 }}{{ if gt (len $items) 2 }}{{ $dataRows = sub (len $items) 2 }}{{ end }}
+  @media(max-width:600px){
+    .nav{padding-bottom:{{ add 92 (mul 29 $dataRows) }}px}
+    .mantra{flex-direction:column;gap:7px}
   }
   {{- end }}
   {{- end }}

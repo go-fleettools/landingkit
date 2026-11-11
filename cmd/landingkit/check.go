@@ -30,9 +30,12 @@ var (
 	chipTagRE = regexp.MustCompile(`<code\b[^>]*\bclass="?mantra-chip\b[^>]*>(.*?)</code>`)
 	footerRE  = regexp.MustCompile(`(?s)<footer\b[^>]*>(.*?)</footer>`)
 	subRE     = regexp.MustCompile(`(?s)<p\b[^>]*\bclass="?[^">]*\bsub\b[^>]*>(.*?)</p>`)
-	tagRE     = regexp.MustCompile(`(?s)<[^>]*>`)
-	spaceRE   = regexp.MustCompile(`\s+`)
-	valueRE   = regexp.MustCompile(`[-.0-9]`)
+	// A feature card as the fleet writes it: <div class="card">…<h3>…</h3><p>…</p></div>
+	// (v0.22.0: the "Pure Go, CGO=0" and "BSD-3-Clause" cards said the strip again).
+	cardRE  = regexp.MustCompile(`(?s)<div\b[^>]*\bclass="?card\b[^>]*>(.*?</p>)\s*</div>`)
+	tagRE   = regexp.MustCompile(`(?s)<[^>]*>`)
+	spaceRE = regexp.MustCompile(`\s+`)
+	valueRE = regexp.MustCompile(`[-.0-9]`)
 )
 
 // chips are the strings of the mantra strip in a built page.
@@ -47,9 +50,40 @@ func chips(page string) []string {
 	// Kit versions that wrote the chips as markup (v0.7.0, which the
 	// go-llmflow landing pins, does) rather than as generated content.
 	for _, m := range chipTagRE.FindAllStringSubmatch(page, -1) {
+		if strings.Contains(m[0], "mantra-goarch") {
+			continue // an architecture, judged by archRepeats
+		}
 		out = append(out, html.UnescapeString(strings.TrimSpace(m[1])))
 	}
 	return out
+}
+
+// The strip's line of architectures (v0.22.0, [params.mantra] goarch). A
+// region naming two or more of them says the line again; ONE name is not a
+// repeat ("measured on an arm64 laptop" is a fact about a measurement).
+var archChipRE = regexp.MustCompile(`<code\b[^>]*\bclass="?[^">]*\bmantra-goarch\b[^>]*>(.*?)</code>`)
+
+func archs(page string) []string {
+	var out []string
+	for _, m := range archChipRE.FindAllStringSubmatch(page, -1) {
+		out = append(out, strings.TrimSpace(m[1]))
+	}
+	return out
+}
+
+// archRepeats lists the architectures of the strip that a text names, when
+// it names at least two of them, as whole words.
+func archRepeats(t string, arch []string) []string {
+	var found []string
+	for _, a := range arch {
+		if regexp.MustCompile(`(^|[^a-z0-9])` + regexp.QuoteMeta(a) + `($|[^a-z0-9])`).MatchString(t) {
+			found = append(found, a)
+		}
+	}
+	if len(found) < 2 {
+		return nil
+	}
+	return found
 }
 
 // facts are the phrases a chip already says: the whole chip, its value when
@@ -81,14 +115,16 @@ func text(markup string) string {
 // redundant lists what a page's footer and hero sub-text repeat.
 func redundant(page string) []string {
 	f := facts(chips(page))
-	if len(f) == 0 {
+	arch := archs(page)
+	if len(f) == 0 && len(arch) == 0 {
 		return nil
 	}
-	where := []string{"footer", "hero sub-text"}
+	where := []string{"footer", "hero sub-text", "a feature card"}
 	var found []string
 	for i, m := range [][]string{
 		firstOf(footerRE.FindAllStringSubmatch(page, -1)),
 		firstOf(subRE.FindAllStringSubmatch(page, -1)),
+		firstOf(cardRE.FindAllStringSubmatch(page, -1)),
 	} {
 		for _, body := range m {
 			t := strings.ToLower(text(body))
@@ -96,6 +132,9 @@ func redundant(page string) []string {
 				if strings.Contains(t, strings.ToLower(fact)) {
 					found = append(found, fmt.Sprintf("%s repeats %q", where[i], fact))
 				}
+			}
+			if a := archRepeats(t, arch); a != nil {
+				found = append(found, fmt.Sprintf("%s repeats the tested architectures %s", where[i], strings.Join(a, ", ")))
 			}
 		}
 	}

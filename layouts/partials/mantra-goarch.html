@@ -1,0 +1,23 @@
+{{- /*
+mantra-goarch.html: the architectures the organisation's tests RUN on, from
+[params.mantra] goarch, checked (v0.22.0). They are a line of their own under
+the strip's chips, so a landing does not say them again in a card: the strip
+is where the fleet's code says what it is, and a body card repeating it is
+what `landingkit check` refuses.
+
+  [params.mantra]
+    goarch = ["amd64", "arm64", "riscv64", "loong64", "ppc64le", "s390x"]
+
+Each value is a GOARCH Go knows (`go tool dist list`), at most once. Claim
+only what CI runs: native or emulated test lanes, not cross-compilation.
+Unset or empty, nothing is rendered and the page is unchanged.
+*/ -}}
+{{- $mt := .Site.Params.mantra | default dict -}}
+{{- $arch := slice -}}
+{{- if isset $mt "goarch" }}{{ $arch = $mt.goarch }}{{ end -}}
+{{- $known := slice "386" "amd64" "arm" "arm64" "loong64" "mips" "mipsle" "mips64" "mips64le" "ppc64" "ppc64le" "riscv64" "s390x" "wasm" -}}
+{{- range $i, $a := $arch -}}
+{{- if not (in $known $a) }}{{ errorf "landingkit: [params.mantra] goarch %q is not a GOARCH Go knows (%s)" $a (delimit $known ", ") }}{{ end -}}
+{{- if in (first $i $arch) $a }}{{ errorf "landingkit: [params.mantra] goarch %q is listed twice" $a }}{{ end -}}
+{{- end -}}
+{{- return $arch -}}

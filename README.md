@@ -434,6 +434,25 @@ and `TestMantra` now fail if the chips stop being text nodes.
   `styles.html` asks `mantra-on.html` the same question, so the two always
   agree. No kit partial mentions either value outside the strip, and a test
   holds that.
+- **The architectures the tests run on, a line of their own (v0.22.0).**
+  Under the chips, "Tested on" and one chip per `GOARCH`:
+
+  ```toml
+  [params.mantra]
+    goarch = ["amd64", "arm64", "riscv64", "loong64", "ppc64le", "s390x"]
+  ```
+
+  Each value must be a `GOARCH` Go knows and appear once, or the build
+  fails. Claim only what CI RUNS (native or emulated test lanes), not what it
+  cross-compiles. The bar grows by one row (two on a phone, where six names
+  wrap); unset, the page is byte for byte the one before. The label is
+  translated (`kit_goarch`). With the line on, a landing does not list the
+  architectures again in its body: `landingkit check` fails a footer, hero
+  sub-text or feature card naming two or more of them (one name, such as the
+  machine a benchmark ran on, is not a repeat).
+- **Feature cards are read too (v0.22.0).** A "Pure Go, CGO=0" or
+  "BSD-3-Clause" card says the strip again, and `check` fails it like the
+  footer.
 - **Turned off for one page** with `mantra: false` in its front matter.
 - **Always off on a `layout: playground` page**, whose stage is fixed under
   the bar.

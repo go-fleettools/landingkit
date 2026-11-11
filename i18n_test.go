@@ -78,9 +78,11 @@ func TestEnglishIsTheOldText(t *testing.T) {
 			t.Errorf("%s = %q, the partials used to write %q", k, en[k], want)
 		}
 	}
-	// the only English key that is new is the selector's
+	// the English keys that are new: the selector's, and the label of the
+	// architectures line (v0.22.0), which only a site setting [params.mantra]
+	// goarch renders, so an English page without it stays as it was
 	for _, k := range keys(en) {
-		if _, old := legacy[k]; !old && k != "kit_language" {
+		if _, old := legacy[k]; !old && k != "kit_language" && k != "kit_goarch" {
 			t.Errorf("%s is new: say so here, and check the English pages stay as they were", k)
 		}
 	}
