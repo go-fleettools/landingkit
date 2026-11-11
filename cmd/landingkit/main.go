@@ -4,7 +4,8 @@
 //	landingkit brand  <logo.svg>          print the [params.brand] block
 //	landingkit verify <site> <ref-site>   text AND pixel check against the reference
 //	landingkit links  <built-site-dir>    every link in the built site resolves
-//	landingkit check  <built-site-dir>    no footer or hero text repeats the mantra strip; the hero's buttons are in the kit's order
+//	landingkit check  <built-site-dir>    no footer or hero text repeats the mantra strip; the hero's row is the kit's, in its order
+//	landingkit audit  <https-url>...      check's rules on published landings, one verdict per page
 //
 // It is the Go port of the kit.py that lived beside the partials before they
 // became a Hugo module. `brand` is ported rule for rule and its output is
@@ -23,6 +24,7 @@ const usage = `usage:
   landingkit links  [flags] <built-site-dir>   every http(s) link in the built site resolves
   landingkit check  <built-site-dir>           fails when the footer or hero sub-text repeats what the mantra strip says, or the hero's buttons are out of the kit's order (docs, try, rest)
   landingkit contrast <background> <fg>...     the WCAG 2.2 ratio of each foreground on that background
+  landingkit audit  <https-url>...             check's rules on PUBLISHED landings: one verdict per page (ok, DRIFT, UNREAD)
 
 run 'landingkit verify -h' for the verify flags
 `
@@ -48,6 +50,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdCheck(args[1:], stdout, stderr)
 	case "contrast":
 		return cmdContrast(args[1:], stdout, stderr)
+	case "audit":
+		return cmdAudit(args[1:], stdout, stderr)
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0

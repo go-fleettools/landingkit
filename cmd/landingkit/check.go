@@ -121,9 +121,58 @@ func firstOf(ms [][]string) []string {
 // check reads the BUILT page, so it judges a hand-written row and the
 // partial's output alike.
 var (
-	ctaRowRE = regexp.MustCompile(`(?s)<div\b[^>]*\bclass=(?:"[^"]*\bcta\b[^"]*"|cta\b)[^>]*>(.*?)</div>`)
+	ctaRowRE = regexp.MustCompile(`(?s)(<div\b[^>]*\bclass=(?:"[^"]*\bcta\b[^"]*"|cta\b)[^>]*>)(.*?)</div>`)
 	ctaBtnRE = regexp.MustCompile(`<a\b[^>]*\bclass=(?:"([^"]*)"|([^\s>"]+))[^>]*>`)
 )
+
+// `check` also fails a hero row the kit did not render (v0.21.0).
+//
+// The order alone did not keep the landings alike. go-numerics and go-ndarray
+// wrote their rows by hand, in the right order, and both put "Try it in the
+// browser" in a ghost button where the kit has the red btn-try, one of them
+// without the icon. Only cta.html renders the row the same way everywhere, so
+// a .cta row must carry the attribute cta.html writes, data-kit-cta. In any
+// row, kit's or not, a link to a playground must be the red btn-try, and a
+// btn-primary or btn-try button must carry its icon (an <svg>).
+var (
+	ctaKitRE  = regexp.MustCompile(`\sdata-kit-cta\b`)
+	ctaLinkRE = regexp.MustCompile(`(?s)<a\b([^>]*)>(.*?)</a>`)
+	hrefRE    = regexp.MustCompile(`\bhref=(?:"([^"]*)"|([^\s>"]+))`)
+	classRE   = regexp.MustCompile(`\bclass=(?:"([^"]*)"|([^\s>"]+))`)
+)
+
+// ctaStray lists what makes a page's hero rows differ from the kit's: a row
+// written by hand, a playground link that is not the red button, a kit button
+// without its icon.
+func ctaStray(page string) []string {
+	var out []string
+	for _, row := range ctaRowRE.FindAllStringSubmatch(page, -1) {
+		if !ctaKitRE.MatchString(row[1]) {
+			out = append(out, "a hero call-to-action row written by hand (no data-kit-cta)")
+		}
+		for _, a := range ctaLinkRE.FindAllStringSubmatch(row[2], -1) {
+			href, classes := attr(hrefRE, a[1]), " "+attr(classRE, a[1])+" "
+			label := text(a[2])
+			if strings.Contains(href, "playground") && !strings.Contains(classes, " btn-try ") {
+				out = append(out, fmt.Sprintf("the playground link %q is not the red btn-try button", label))
+			}
+			for _, kind := range []string{"btn-primary", "btn-try"} {
+				if strings.Contains(classes, " "+kind+" ") && !strings.Contains(a[2], "<svg") {
+					out = append(out, fmt.Sprintf("the %s button %q has no icon", kind, label))
+				}
+			}
+		}
+	}
+	return out
+}
+
+func attr(re *regexp.Regexp, tag string) string {
+	m := re.FindStringSubmatch(tag)
+	if m == nil {
+		return ""
+	}
+	return m[1] + m[2]
+}
 
 // ctaRank is a button's place in the row, from its classes; -1 for a link the
 // order says nothing about.
@@ -147,7 +196,7 @@ func ctaDisorder(page string) (disorder []string, rows int) {
 	for _, row := range ctaRowRE.FindAllStringSubmatch(page, -1) {
 		rows++
 		last, lastName := -1, ""
-		for _, b := range ctaBtnRE.FindAllStringSubmatch(row[1], -1) {
+		for _, b := range ctaBtnRE.FindAllStringSubmatch(row[2], -1) {
 			rank, name := ctaRank(b[1] + " " + b[2])
 			switch {
 			case rank < 0:
@@ -189,6 +238,10 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "%s: %s; the kit's order is docs (btn-primary), try (btn-try), then the rest: list them in [[params.cta]] and render the row with {{ partial \"cta.html\" . }}\n", p, o)
 			bad++
 		}
+		for _, s := range ctaStray(page) {
+			fmt.Fprintf(stderr, "%s: %s; list the buttons in [[params.cta]] (kind = docs, try, github or link) and render the row with {{ partial \"cta.html\" . }}, plus {{ partial \"btn-try-style.html\" . }} after styles.html for a try button\n", p, s)
+			bad++
+		}
 		return nil
 	})
 	if err != nil {
@@ -198,6 +251,6 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	if bad > 0 {
 		return 1
 	}
-	fmt.Fprintf(stdout, "check: %d page(s) with the mantra strip, nothing said twice; %d hero call-to-action row(s) in the kit's order\n", seen, rows)
+	fmt.Fprintf(stdout, "check: %d page(s) with the mantra strip, nothing said twice; %d hero call-to-action row(s), rendered by the kit and in its order\n", seen, rows)
 	return 0
 }

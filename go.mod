@@ -9,4 +9,7 @@ module github.com/go-fleettools/landingkit
 // And this line IS the lane's toolchain: ci.yml reads `go-version-file:
 // go.mod`, so a directive below the fix is a lane linking the vulnerable
 // standard library, not just a floor for consumers.
-go 1.27.3
+//
+// 1.27.4: GO-2026-6859, reachable through stdlib.Close and ReadFrom (the
+// fetches of `links` and `audit`), fixed there.
+go 1.27.4

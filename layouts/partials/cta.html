@@ -11,11 +11,15 @@
 
      The words are the site's (params are per language), so a site in several
      languages translates them where it translates everything else. A "try" button
-     needs {{ partial "btn-try-style.html" . }} in the <head>, after styles.html. */ -}}
+     needs {{ partial "btn-try-style.html" . }} in the <head>, after styles.html.
+
+     data-kit-cta marks the row as the kit's: `landingkit check` (v0.21.0) refuses
+     a .cta row without it, because a row written by hand is how landings drifted
+     apart (a ghost "Try it" button, a missing icon). */ -}}
 {{- $ctx := . -}}
 {{- $items := $ctx.Site.Params.cta -}}
 {{- if $items -}}
-<div class="cta">
+<div class="cta" data-kit-cta>
 {{- range $kind := slice "docs" "try" "github" "link" -}}
 {{- range $items -}}
 {{- if not (in (slice "docs" "try" "github" "link") .kind) -}}{{ errorf "cta: unknown kind %q, want docs, try, github or link" .kind }}{{- end -}}

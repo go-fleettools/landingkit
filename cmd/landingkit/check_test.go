@@ -129,13 +129,17 @@ func TestCheckFailsGhostBeforePrimaryAndTry(t *testing.T) {
 	}
 }
 
-// The conforming rows: docs, try, then the rest; a lone button; links that are
-// not kit buttons anywhere in the row; and a page with no row at all.
+// An icon as the kit's partials write it.
+const icon = `<svg class="icon" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M0 0h16v16H0z"/></svg>`
+
+// The conforming rows, as cta.html renders them (data-kit-cta, icons): docs,
+// try, then the rest; a lone button; links that are not kit buttons anywhere
+// in the row; and a page with no row at all.
 func TestCheckPassesRowsInTheKitsOrder(t *testing.T) {
 	for name, row := range map[string]string{
-		"docs, try, ghost": `<div class=cta><a class="btn btn-primary" href=/docs/>Docs</a><a class="btn btn-try" href=/pg/>Try</a><a class=btn-ghost href=/src/>Source</a><a class="btn btn-ghost" href=/x/>More</a></div>`,
-		"a lone button":    `<div class="cta"><a class="btn btn-primary" href=/docs/>Docs</a></div>`,
-		"plain links":      `<div class=cta><a class="btn btn-ghost" href=/src/>Source</a><a class=other href=/o/>Other</a><a href=/n/>No class</a><a class=btn href=/b/>Bare</a></div>`,
+		"docs, try, ghost": `<div class=cta data-kit-cta><a class="btn btn-primary" href=/docs/>` + icon + `Docs</a><a class="btn btn-try" href=/playground/>` + icon + `Try</a><a class=btn-ghost href=/src/>Source</a><a class="btn btn-ghost" href=/x/>More</a></div>`,
+		"a lone button":    `<div class="cta" data-kit-cta><a class="btn btn-primary" href=/docs/>` + icon + `Docs</a></div>`,
+		"plain links":      `<div class=cta data-kit-cta><a class="btn btn-ghost" href=/src/>Source</a><a class=other href=/o/>Other</a><a href=/n/>No class</a><a class=btn href=/b/>Bare</a></div>`,
 		"no row":           `<p>nothing</p>`,
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -146,10 +150,40 @@ func TestCheckPassesRowsInTheKitsOrder(t *testing.T) {
 	}
 }
 
+// The planted positives from the defect that prompted the rule (go-numerics'
+// and go-ndarray's landings, 2026-11-11): rows written by hand, in the right
+// order, with "Try it in the browser" as a ghost button, once without its icon.
+func TestCheckFailsARowTheKitDidNotRender(t *testing.T) {
+	for name, tc := range map[string]struct{ row, want string }{
+		"hand-written, otherwise right": {
+			`<div class=cta><a class="btn btn-primary" href=/docs/>` + icon + `Docs</a><a class="btn btn-try" href=/playground/>` + icon + `Try</a></div>`,
+			"written by hand (no data-kit-cta)"},
+		"playground as a ghost button": {
+			`<div class=cta data-kit-cta><a class="btn btn-primary" href=/docs/>` + icon + `Docs</a><a class="btn btn-ghost" href=/playground/>` + icon + `Try it in the browser →</a></div>`,
+			`the playground link "Try it in the browser →" is not the red btn-try button`},
+		"playground as a second primary": {
+			`<div class=cta data-kit-cta><a class="btn btn-primary" href=https://x.github.io/playground/>Try it</a></div>`,
+			`the playground link "Try it" is not the red btn-try button`},
+		"primary without its icon": {
+			`<div class=cta data-kit-cta><a class="btn btn-primary" href=/docs/>Docs</a></div>`,
+			`the btn-primary button "Docs" has no icon`},
+		"try without its icon": {
+			`<div class=cta data-kit-cta><a class="btn btn-try" href=/playground/>Try</a></div>`,
+			`the btn-try button "Try" has no icon`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, msg := runCheck(t, checkSite(t, ctaPage(tc.row)))
+			if code != 1 || !strings.Contains(msg, tc.want) || !strings.Contains(msg, `{{ partial "cta.html" . }}`) {
+				t.Fatalf("exit %d, want 1 and %q:\n%s", code, tc.want, msg)
+			}
+		})
+	}
+}
+
 // The success line counts the rows it read, so a check that read none cannot
 // pass for one that read them all.
 func TestCheckCountsTheRows(t *testing.T) {
-	d := checkSite(t, ctaPage(`<div class=cta><a class="btn btn-primary" href=/docs/>Docs</a></div>`))
+	d := checkSite(t, ctaPage(`<div class=cta data-kit-cta><a class="btn btn-primary" href=/docs/>`+icon+`Docs</a></div>`))
 	if code, msg := runCheck(t, d); code != 0 || !strings.Contains(msg, "1 hero call-to-action row(s)") {
 		t.Fatalf("exit %d: %s", code, msg)
 	}
