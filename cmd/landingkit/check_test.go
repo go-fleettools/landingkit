@@ -82,6 +82,53 @@ func TestCheckSeesMarkupChips(t *testing.T) {
 	}
 }
 
+// The strip with its line of architectures, as mantra.html renders it.
+const archLine = `<div class=mantra><span class=mantra-row><code class=mantra-chip>LICENSE=BSD-3-Clause</code><code class=mantra-chip>CGO_ENABLED=0</code></span><span class=mantra-arch><span class=mantra-arch-label>Tested on</span><code class="mantra-chip mantra-goarch">amd64</code><code class="mantra-chip mantra-goarch">arm64</code><code class="mantra-chip mantra-goarch">riscv64</code></span></div>`
+
+func archPage(body string) string {
+	return `<!doctype html><html><body><header class=nav>` + archLine + `</header><main><section class=hero><p class=sub>A library.</p></section>` + body + `</main><footer>© the authors</footer></body></html>`
+}
+
+// The planted positives from go-numerics' landing (2026-11-11): a "Pure Go,
+// CGO=0" card and a "BSD-3-Clause" card under a strip that says both.
+func TestCheckFailsCardsThatRepeatTheStrip(t *testing.T) {
+	body := `<div class=grid><div class="card"><div class="ico">📦</div><h3>Pure Go, CGO=0</h3><p>No cgo.</p></div><div class=card><div class=ico>⚖️</div><h3>BSD-3-Clause</h3><p>Every repository.</p></div><div class=card><h3>Fast</h3><p>Faster than SciPy.</p></div></div>`
+	code, msg := runCheck(t, checkSite(t, archPage(body)))
+	if code != 1 {
+		t.Fatalf("exit %d, want 1:\n%s", code, msg)
+	}
+	for _, want := range []string{`a feature card repeats "Pure Go"`, `a feature card repeats "BSD-3-Clause"`} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("missing %q in:\n%s", want, msg)
+		}
+	}
+	if strings.Contains(msg, `"amd64"`) || strings.Contains(msg, "Faster") {
+		t.Errorf("an architecture chip was read as a fact, or a clean card was flagged:\n%s", msg)
+	}
+}
+
+// Two or more of the strip's architectures in one text say the line again;
+// one is a fact about something else and passes.
+func TestCheckArchitectures(t *testing.T) {
+	for name, tc := range map[string]struct {
+		body string
+		code int
+		want string
+	}{
+		"a card listing them": {`<div class=card><h3>Portable</h3><p>CI runs the tests on amd64 and arm64 and under emulation on riscv64.</p></div>`, 1,
+			"a feature card repeats the tested architectures amd64, arm64, riscv64"},
+		"one name passes":       {`<div class=card><h3>Fast</h3><p>Measured on an arm64 laptop.</p></div>`, 0, "check:"},
+		"a word containing one": {`<div class=card><h3>x</h3><p>xamd64 and arm64y are not names.</p></div>`, 0, "check:"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, msg := runCheck(t, checkSite(t, archPage(tc.body)))
+			if code != tc.code || !strings.Contains(msg, tc.want) {
+				t.Fatalf("exit %d, want %d and %q:\n%s", code, tc.code, tc.want, msg)
+			}
+		})
+	}
+}
+
 // A page that cannot be read is an error, never a pass.
 func TestCheckUnreadablePage(t *testing.T) {
 	d := t.TempDir()
