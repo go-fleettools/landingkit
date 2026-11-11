@@ -509,6 +509,24 @@ the new check removed, all five pass, which is how the test is known to bite.
 This is a breaking change for a landing that writes its row by hand and runs
 `check`: it goes red on the version bump, with the fix in the message.
 
+### Measuring the fleet: `landingkit audit` (v0.21.0)
+
+`check` is a gate only where a landing's CI runs it. `audit` applies the same
+rules to the PUBLISHED pages, by URL, without a clone:
+
+```sh
+gh api --paginate user/orgs --jq '"https://" + (.[].login | ascii_downcase) + ".github.io/"' > fleet.txt
+landingkit audit -f fleet.txt          # or: landingkit audit <https-url>...
+```
+
+One line per page: `ok` (with the number of hero rows read), `DRIFT` with each
+finding, or `UNREAD` with the reason; then a count. An unreadable page fails the
+run, never passes it. https only (redirects too), 15 s and 8 MiB per page, at
+most 5 redirects. First run, 2026-11-11, 371 org pages: 33 ok, 308 drifted,
+30 unread; 310 hand-written rows (no landing used `cta.html` yet), 153 facts
+said twice beside the mantra strip, 5 playground links that are not `btn-try`
+(go-ndarray, go-numerics, go-slides among them), 4 buttons without their icon.
+
 ## Languages (v0.8.0)
 
 A landing in one language is **exactly the page it was**: the words the
