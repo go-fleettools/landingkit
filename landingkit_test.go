@@ -124,8 +124,14 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	// ⛔ The second band is PARALLEL to the first: same corner, same rotation.
 	// A different angle is the one thing that would make them read as two
 	// unrelated decorations, and it is a single character to get wrong.
-	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:48px;right:-36px;") {
-		t.Error("the fork band's geometry moved: the second band is placed against it")
+	// ⚠ A TRIPWIRE, NOT A RULE. The second band is placed relative to this one,
+	// so a change here silently changes the pair; the literal makes that
+	// deliberate rather than accidental. It has already fired once, when the
+	// fork band was moved toward the corner on purpose (-36 -> -46), and the
+	// computed pair check below is what actually governs the distance.
+	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:48px;right:-46px;") {
+		t.Error("the fork band's geometry moved: the second band is placed against it, " +
+			"so check assertTheBandsReadAsAPair still passes and update this literal")
 	}
 	assertTheBandsReadAsAPair(t, s)
 	if strings.Count(s, "transform:rotate(45deg)") != 2 {
