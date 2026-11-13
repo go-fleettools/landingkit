@@ -129,7 +129,7 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	// deliberate rather than accidental. It has already fired once, when the
 	// fork band was moved toward the corner on purpose (-36 -> -46), and the
 	// computed pair check below is what actually governs the distance.
-	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:48px;right:-46px;") {
+	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:40px;right:-46px;") {
 		t.Error("the fork band's geometry moved: the second band is placed against it, " +
 			"so check assertTheBandsReadAsAPair still passes and update this literal")
 	}
@@ -247,6 +247,23 @@ func assertTheBandIsClipped(t *testing.T, sheet string) {
 			"edge, not float",
 			x, y, boxW, bandW, top, rightOff)
 	}
+	// ⛔⛔ AND IT LEAVES THE PAGE AT THE TOP AND AT THE RIGHT, not just anywhere.
+	// The box is anchored at the page's top-right corner, so its top and right
+	// edges ARE the page's and the other two are mid-page. A band clipped on the
+	// left or the bottom stops in the middle of the page, which is the thing a
+	// reader asked to be rid of — and "clipped somewhere", which the two checks
+	// below test, is satisfied by exactly that.
+	if x, y := centreX-reach, centreY-reach; !(y < 0 && x >= 0) {
+		t.Errorf("the band's upper end leaves at (%.0f, %.0f): it must cross the "+
+			"box's TOP edge (y<0) while still inside it horizontally (x>=0), or it "+
+			"stops in the middle of the page instead of running off the top", x, y)
+	}
+	if x, y := centreX+reach, centreY+reach; !(x > boxW && y <= boxW) {
+		t.Errorf("the band's lower end leaves at (%.0f, %.0f), box %.0f: it must "+
+			"cross the RIGHT edge (x>box) while still inside vertically (y<=box)",
+			x, y, boxW)
+	}
+
 	// ⛔ AND THE LOWER END through the right or bottom edge. Moving the band up
 	// to pair it with the fork one pulled this end back inside a box that had
 	// been big enough; a test that watched only the other end would have passed.

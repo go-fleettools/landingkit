@@ -208,7 +208,7 @@ jobs:
           for want in \
             '<div class="commons-ribbon"><a href="https://en.wikipedia.org/wiki/Digital_commons" aria-label="Digital Commons">Digital Commons</a></div>' \
             '<details class="brand-menu">' \
-            '<li><a href="https://go-slides.github.io">go-slides</a></li>' \
+            '<li><a href="https://go-slides.github.io">go-slides<svg class="icon"' \
             '.commons-ribbon{position:absolute;top:0;right:0;' \
             '.brand-menu{position:relative}'; do
             grep -qF -- "$want" "$page" || { echo "::error::$want is not in the page"; exit 1; }
@@ -222,9 +222,21 @@ jobs:
           # aria-hidden rather than making a reader hear the name twice.
           grep -qF -- '<img src="https://go-pdfkit.github.io/favicon.svg" width="20" height="20" alt="" aria-hidden="true">go-pdfkit' "$page" \
             || { echo "::error::the sibling's icon is not in its menu row"; exit 1; }
-          # ...and an entry WITHOUT one is the plain name it was
-          grep -qF -- '<li><a href="https://go-slides.github.io">go-slides</a></li>' "$page" \
-            || { echo "::error::an entry with no icon is not the plain row"; exit 1; }
+          # ...and an entry WITHOUT one is the name alone before the arrow.
+          # ⚠ NOT "the plain row": every row ends with the ↗ since v0.26.0, so
+          # the old literal `>go-slides</a></li>` can no longer match and this
+          # grep went red on the change that added it.
+          grep -qF -- '<li><a href="https://go-slides.github.io">go-slides<svg class="icon"' "$page" \
+            || { echo "::error::an entry with no icon is not the name followed by the arrow"; exit 1; }
+          # ⛔ AND EVERY ROW CARRIES THE ARROW, which is what says the link
+          # leaves this site; one row having it is not the feature.
+          #
+          # ⚠ COUNTED BY THE ARROW'S OWN PATH, not by `class="icon"`: the hero's
+          # buttons carry icons with identical attributes, so counting those
+          # gives 5 on this page and the check would have been measuring the
+          # wrong thing while looking right.
+          test "$(grep -c -F 'M4.53 4.75A.75.75 0 0 1 5.28 4h6.01' "$page")" = 2 \
+            || { echo "::error::the arrow is not on both menu rows"; exit 1; }
           # ⛔ AND THE SITE'S OWN HOME IS NOT A ROW. It was, until a reader
           # pointed out they are already on that page; an entry that goes
           # nowhere is one more row to read past.

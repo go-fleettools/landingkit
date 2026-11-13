@@ -167,13 +167,13 @@
        from the corner by the measure in the second band's comment below, so
        the two are 17px apart rather than 10px; the pair still reads as a pair
        and the test that refuses "clear across the corner" bounds it at 40. */}}
-  .fork-ribbon a{position:absolute;top:48px;right:-46px;width:200px;padding:7px 0;transform:rotate(45deg);
+  .fork-ribbon a{position:absolute;top:40px;right:-46px;width:200px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .fork-ribbon a:hover{filter:brightness(1.08)}
   .fork-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
   @media(max-width:1420px){.nav .wrap{padding-right:112px}}
-  @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:34px;right:-52px;font-size:11px;padding:5px 0}.nav .wrap{padding-right:84px}}
+  @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:28px;right:-52px;font-size:11px;padding:5px 0}.nav .wrap{padding-right:84px}}
   {{- /* The Digital Commons ribbon: a SECOND band in the same corner, outside
        the fork one and at the same 45°, so the two are parallel rather than
        crossed. It is further from the corner, so its chord is longer: the box
@@ -227,7 +227,26 @@
        third constraint was not in the arithmetic. 155/55/300 satisfies all
        three: centre at (41, 70) in the box, text within (2, 31)–(80, 109),
        upper end at (-65, -36), lower end at (147, 176) past the bottom. */}}
-  .commons-ribbon{position:absolute;top:0;right:0;width:155px;height:155px;overflow:hidden;z-index:29;pointer-events:none}
+  {{- /* ⛔ THE BAND LEAVES THE PAGE AT THE TOP AND AT THE RIGHT, which is a
+       different condition from "clipped somewhere" and has to be solved, not
+       nudged. The box is anchored at the page's top-right corner, so its top
+       and right edges ARE the page's; the band must exit through those two and
+       not through the left or the bottom, which are mid-page.
+
+       With the box W, the band's right offset R, its width L and its top T,
+       and a 30px band rotating about its own centre:
+
+           cx = W + R - L/2    cy = T + 15    reach = L·cos45/2
+
+       upper end (cx-reach, cy-reach) leaves through the TOP   → cy < reach and cx ≥ reach
+       lower end (cx+reach, cy+reach) leaves through the RIGHT → cx+reach > W and cy+reach ≤ W
+
+       205/52/290/76 satisfies all four with ~10px to spare at each end:
+       centre (112, 91), reach 102.5, upper end (9.5, −11.5), lower (214.5,
+       193.5). It also keeps the band where it was relative to the fork one —
+       184/√2 = 130.1px from the corner, unchanged — so extending it did not
+       move it. */}}
+  .commons-ribbon{position:absolute;top:0;right:0;width:205px;height:205px;overflow:hidden;z-index:29;pointer-events:none}
   {{- /* ⛔ THE BAND IS 400px BECAUSE A ROTATED ONE IS MEASURED BEFORE IT TURNS.
        It was 260px and BOTH ITS ENDS STOPPED IN MID-AIR inside the box: a
        corner ribbon is only a ribbon because the box clips it, and one that
@@ -249,7 +268,14 @@
        box starts 62px in and is 238 wide, so its middle is at 62+119 = 181
        rather than 150. box-sizing is border-box here, so the element's own
        geometry — and every clipping number above — is untouched. */}}
-  .commons-ribbon a{position:absolute;top:55px;right:-36px;width:300px;padding:7px 0 7px 62px;transform:rotate(45deg);
+  {{- /* ⭐ AND THE PADDING THAT CENTRED THE TEXT IS GONE, because the geometry
+       did the job. The 62px was there to push the words to the middle of a
+       visible chord that ran from the box's LEFT edge to its BOTTOM — an
+       asymmetric run whose middle was 31px past the element's centre. Now that
+       the band leaves through the top and the right, the chord is t ∈ [−129,
+       +132] and its middle is 1.4px from the centre: the text is centred by
+       `text-align:center` alone. */}}
+  .commons-ribbon a{position:absolute;top:76px;right:-52px;width:290px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .commons-ribbon a:hover{filter:brightness(1.08)}
@@ -257,11 +283,11 @@
   {{- /* the bar keeps clear of the OUTER band, which reaches further across
        than the fork one: its 112px becomes 128px for a 165px box, and a
        phone's 84px becomes 104px for a 140px one */}}
-  @media(max-width:1420px){.nav .wrap{padding-right:120px}}
+  @media(max-width:1420px){.nav .wrap{padding-right:156px}}
   {{- /* the phone's pair, by the same arithmetic at the phone's sizes: the
        fork band is 66.1px from the corner, this one 106.1px, and the words are
        about 93px at 11px so the box must hold its centre ±33 */}}
-  @media(max-width:600px){.commons-ribbon{width:125px;height:125px}.commons-ribbon a{top:51px;right:-52px;font-size:11px;padding:5px 0;width:280px}.nav .wrap{padding-right:96px}}
+  @media(max-width:600px){.commons-ribbon{width:175px;height:175px}.commons-ribbon a{top:57px;right:-48px;font-size:11px;padding:5px 0 5px 19px;width:260px}.nav .wrap{padding-right:132px}}
   {{- end }}
   {{- /* The top bar's title as a menu of the organisation's other sites
        (brand-menu.html). Emitted only for a site with [[params.siblings]]:
@@ -297,6 +323,12 @@
        because a menu row is not a masthead */}}
   .brand-menu li a{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--ink)}
   .brand-menu li img{width:20px;height:20px;border-radius:5px;flex:none}
+  {{- /* the arrow that says a row LEAVES THIS SITE: pushed to the right edge of
+       the row by the auto margin, smaller and paler than the name because it
+       is a mark and not a word, and brought to full strength on hover with the
+       row it belongs to */}}
+  .brand-menu li .icon{width:13px;height:13px;flex:none;margin-left:auto;opacity:.45;transition:opacity .15s}
+  .brand-menu li a:hover .icon,.brand-menu li a:focus-visible .icon{opacity:.9}
   .brand-menu li a:hover{background:var(--chip-bg)}
   .brand-menu li a:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
   {{- end }}
