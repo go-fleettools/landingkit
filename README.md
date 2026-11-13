@@ -18,8 +18,8 @@ Renovate proposes the bump.
 | `layouts/partials/styles.html` | the whole design. Brand colours come from `[params.brand]`, defaulting to go-fileshare's cyan. It also emits `<meta name="darkreader-lock">` and the fork ribbon's CSS |
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
-| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.24.0) |
-| `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites, from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.24.0) |
+| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0) |
+| `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites, from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
@@ -245,7 +245,7 @@ right after `</header>`. It is the "Fork me on GitHub" ribbon (github.blog,
 follows the theme. It REPLACES the nav bar's GitHub button, and the hero has no
 "Browse the source" button: all three led to the same place.
 
-## The Digital Commons band (v0.24.0)
+## The Digital Commons band (v0.23.0)
 
 A second band in the same corner, outside the fork one and at the same 45°, so
 the two read as a pair. "Fork me on GitHub" says the code can be taken; this
@@ -275,7 +275,7 @@ emitted unconditionally would fail every landing against the reference until it
 rebuilt. CI builds `example/` against the base branch and compares every page
 byte for byte.
 
-## The title's menu of sibling sites (v0.24.0)
+## The title's menu of sibling sites (v0.23.0)
 
 The top bar's title, with the organisation's other sites hanging from it.
 
