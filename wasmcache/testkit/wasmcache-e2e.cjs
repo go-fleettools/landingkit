@@ -40,6 +40,10 @@ const root = path.resolve(args.root || "."), pagePath = args.page || "/playgroun
 const apiPrefix = args.api || "/api/", ready = args.ready || "true";
 const prepare = args.prepare || "localStorage.setItem('wasmcache-kit','work')";
 const verify = args.verify || "localStorage.getItem('wasmcache-kit')==='work'";
+// --hooks <file.cjs>: an app's own way to make work and to find it again,
+// exporting { viewport, async prepare(page), async verify(page) -> bool };
+// without it --prepare and --verify are JS expressions.
+const hooks = args.hooks ? require(path.resolve(args.hooks)) : {};
 const fail = (m) => { console.error("FAIL " + m); process.exit(1); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
@@ -85,9 +89,11 @@ const out = {};
   const ctx = await browser.createBrowserContext();
   const open = async () => {
     const page = await ctx.newPage();
+    if (hooks.viewport) await page.setViewport(hooks.viewport);
     page.on("pageerror", (e) => fail("page error: " + e));
     await page.goto(base + pagePath, { waitUntil: "load" });
     await page.waitForFunction(ready, { timeout: 90000 });
+    await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 }); // the page called start()
     return page;
   };
   const cacheName = () => manifest.name + "-" + manifest.build;
@@ -173,7 +179,7 @@ const out = {};
   out.api = apiPrefix + " reached the server every time, with and without Authorization; the cache holds only the manifest's files";
 
   // 5. a newer deploy: a prompt, no reload
-  await page.evaluate(prepare);
+  if (hooks.prepare) await hooks.prepare(page); else await page.evaluate(prepare);
   await page.evaluate(() => { window.__kitMarker = "still here"; });
   const langs = await page.evaluate(() => Object.keys(wasmcache.words()));
   if (langs.length !== 12) fail("the prompt speaks " + langs.length + " languages, not 12");
@@ -197,7 +203,8 @@ const out = {};
   // 6. accept: reload into the new build, work kept, old cache gone
   await Promise.all([page.waitForNavigation({ waitUntil: "load", timeout: 30000 }), page.click("#wasmcache-reload")]);
   await page.waitForFunction(ready, { timeout: 90000 });
-  if (!(await page.evaluate(verify))) fail("the work was not kept over the update");
+  await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+  if (!(hooks.verify ? await hooks.verify(page) : await page.evaluate(verify))) fail("the work was not kept over the update");
   const info = await page.evaluate(() => new Promise((res) => {
     navigator.serviceWorker.addEventListener("message", (e) => res(e.data.wasmcache));
     navigator.serviceWorker.controller.postMessage("info");
