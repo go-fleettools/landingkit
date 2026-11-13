@@ -70,10 +70,32 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	})
 	contract(t, "layouts/partials/brand-menu.html", []string{
 		`{{- if $sibs -}}`,
-		`<a class="brand" href="/">{{ .Site.Title }}</a>`, // byte for byte the old line
+		`<a class="brand" href="/">{{ $mark }}{{ $ctx.Site.Title }}</a>`,
 		`<details class="brand-menu">`,
 		`{{ i18n "kit_siblingSites" | safeHTML }}`,
 	})
+
+	// ⛔⛔ AND IT MUST BE ABLE TO CARRY THE BAR'S LOGO. v0.23.0 shipped this
+	// partial writing the title and nothing else, because the example's bar is
+	// a bare title and that looked finished. The first real landing to adopt it
+	// has an <img class="glyph"> in front of the name, and adopting the menu
+	// would have dropped the logo off its top bar.
+	//
+	// The sheet has styled `.glyph` since the beginning while every landing
+	// wrote the <img> by hand: the gap was between what the kit styles and what
+	// any partial of it could emit.
+	contract(t, "layouts/partials/brand-menu.html", []string{
+		`{{- if reflect.IsMap . }}`, // a page context still works: v0.23.0's callers
+		`class=\"glyph\" src=\"%s\" width=\"32\" height=\"32\"`,
+		`($glyphAlt | htmlEscape)`, // the alt text is a site's, so it is escaped
+	})
+	g := contract(t, "layouts/partials/styles.html", []string{`.glyph{width:32px;height:32px;`})
+	// ⚠ THE PARTIAL'S 32 IS THE SHEET'S 32. Written in two places, they can
+	// drift; the attributes exist so the bar does not reflow while the logo
+	// loads, and a width that disagreed with the rule would do exactly that.
+	if !strings.Contains(g, "width:32px;height:32px") {
+		t.Error("the sheet no longer sizes .glyph at 32px: brand-menu.html still writes 32")
+	}
 
 	// ⛔ AND THE SHEET'S NEW RULES ARE GUARDED BY THE SAME PARAMS. A rule
 	// emitted unconditionally would move every organisation's stylesheet, and

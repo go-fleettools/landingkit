@@ -20,6 +20,28 @@
            name = "go-pdfkit"
            url  = "https://go-pdfkit.github.io"
 
+     ⛔⛔ AND THE BAR'S LOGO IS NOT OPTIONAL DECORATION: v0.23.0 SHIPPED THIS
+     PARTIAL UNABLE TO CARRY ONE. The example writes a bare title, so the
+     partial wrote `{{ .Site.Title }}` and looked finished. The first real
+     landing to adopt it — go-tex — has
+
+         <a class="brand" href="/"><img class="glyph" src="/favicon.svg"
+            width="32" height="32" alt="go-tex logo"> go-tex</a>
+
+     and adopting the menu would have DROPPED THE LOGO off the top bar. The
+     kit has had the `.glyph` rule since the beginning (32×32, radius 9, a
+     brand-coloured drop shadow) while every landing wrote the <img> by hand,
+     so the gap was between what the sheet styled and what any partial could
+     emit. Called with a glyph:
+
+         {{ partial "brand-menu.html" (dict "ctx" . "glyph" "/favicon.svg"
+                                            "glyphAlt" "go-tex logo") }}
+
+     and `width`/`height` are the kit's 32, because the rule is.
+
+     ⚠ CALLED WITH A PAGE RATHER THAN A DICT IT IS WHAT IT WAS, so every caller
+     written against v0.23.0 keeps working and the example does not move.
+
      ⭐ IT IS A <details>, NOT A SCRIPT. The bar already works without
      JavaScript and this keeps it so: a disclosure opens on click and on Enter
      or Space, closes on Escape in every current browser, and is announced as
@@ -27,14 +49,18 @@
      re-implement and usually half-implements. The first item is the site's own
      home, which is what the title linked to before, so nothing the bar could
      do is lost. */}}
-{{- $sibs := .Site.Params.siblings }}
+{{- $ctx := . }}{{ $glyph := "" }}{{ $glyphAlt := "" }}
+{{- if reflect.IsMap . }}{{ $ctx = .ctx }}{{ $glyph = .glyph | default "" }}{{ $glyphAlt = .glyphAlt | default "" }}{{ end }}
+{{- $sibs := $ctx.Site.Params.siblings }}
+{{- $mark := "" }}
+{{- with $glyph }}{{ $mark = printf "<img class=\"glyph\" src=\"%s\" width=\"32\" height=\"32\" alt=\"%s\"> " (. | safeURL) ($glyphAlt | htmlEscape) | safeHTML }}{{ end }}
 {{- if $sibs -}}
-<details class="brand-menu"><summary class="brand" aria-label="{{ i18n "kit_siblingSites" | safeHTML }}">{{ .Site.Title }}<span class="brand-caret" aria-hidden="true"></span></summary><ul>
-  <li><a href="/">{{ .Site.Title }}</a></li>
+<details class="brand-menu"><summary class="brand" aria-label="{{ i18n "kit_siblingSites" | safeHTML }}">{{ $mark }}{{ $ctx.Site.Title }}<span class="brand-caret" aria-hidden="true"></span></summary><ul>
+  <li><a href="/">{{ $ctx.Site.Title }}</a></li>
   {{- range $sibs }}
   <li><a href="{{ .url }}">{{ .name }}</a></li>
   {{- end }}
 </ul></details>
 {{- else -}}
-<a class="brand" href="/">{{ .Site.Title }}</a>
+<a class="brand" href="/">{{ $mark }}{{ $ctx.Site.Title }}</a>
 {{- end -}}

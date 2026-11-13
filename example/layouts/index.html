@@ -9,7 +9,11 @@
 </head>
 <body class="lm">
 <header class="nav"><div class="wrap nav-in">
-  {{ partial "brand-menu.html" . }}
+  {{/* Called with a DICT, which is how a landing passes the bar's logo. With
+       no [params.brandGlyph] the glyph is empty and this renders exactly what
+       the page context renders, so the example does not move — and the dict
+       path is still the one under test. */ -}}
+  {{ partial "brand-menu.html" (dict "ctx" . "glyph" (.Site.Params.brandGlyph | default "") "glyphAlt" (.Site.Params.brandGlyphAlt | default "")) }}
   {{ partial "theme-toggle.html" . }}
 </div></header>
 {{/* ⛔ THE TWO BANDS ARE WRITTEN WITH NO SEPARATOR BETWEEN THEM. commons-ribbon

@@ -19,7 +19,7 @@ Renovate proposes the bump.
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
 | `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0) |
-| `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites, from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
+| `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites (v0.23.0; logos v0.24.0), from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
@@ -297,6 +297,18 @@ in place of `<a class="brand" href="/">{{ .Site.Title }}</a>`.
 
 With no `[[params.siblings]]` it IS that anchor, character for character, so a
 landing can adopt the partial before it has anything to list.
+
+⛔ **A bar with a logo passes it in (v0.24.0).** v0.23.0 shipped this partial
+writing the title and nothing else — the example's bar is a bare title, so that
+looked finished — and the first landing to adopt it would have lost its logo:
+
+```
+{{ partial "brand-menu.html" (dict "ctx" . "glyph" "/favicon.svg" "glyphAlt" "<org> logo") }}
+```
+
+`width` and `height` are the kit's 32, because `.glyph` is. Called with a page
+context instead of a dict it is exactly what v0.23.0 rendered, so nothing
+written against that release has to change.
 
 It is a `<details>`, not a script: the bar already works without JavaScript and
 this keeps it so. A disclosure opens on click and on Enter or Space, closes on
