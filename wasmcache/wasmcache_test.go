@@ -22,6 +22,15 @@ func put(t *testing.T, dir, rel, body string) {
 	}
 }
 
+func readFile(t *testing.T, dir, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
 func site(t *testing.T) string {
 	d := t.TempDir()
 	put(t, d, "playground/index.html", "<html>")
@@ -54,7 +63,7 @@ func TestGenerate(t *testing.T) {
 			t.Fatalf("%s: lazy = %v", f.Path, f.Lazy)
 		}
 	}
-	if m.Version != m.Build || len(m.Build) != 16 || m.Name != "wasmcache" || len(m.Exclude) != 1 || m.Exclude[0] != "/api/" {
+	if m.Version != m.Build || len(m.Build) != 16 || m.Name != "wasmcache:/playground/" || len(m.Exclude) != 1 || m.Exclude[0] != "/api/" {
 		t.Fatalf("manifest %+v", m)
 	}
 	// every scope's worker holds the manifest, and only that
@@ -104,6 +113,7 @@ func TestGenerateRefusals(t *testing.T) {
 		{"scope without end slash", func(c *Config) { c.Scopes = []string{"/playground"} }, "must start and end"},
 		{"scope with ..", func(c *Config) { c.Scopes = []string{"/a/../b/"} }, "must start and end"},
 		{"bad home", func(c *Config) { c.Home = "x/" }, "must start and end"},
+		{"a name with the separator", func(c *Config) { c.Name = "a|b" }, "must not hold a |"},
 		{"bad exclude", func(c *Config) { c.Exclude = []string{"api/"} }, "must start with a slash"},
 		{"asset matches nothing", func(c *Config) { c.Assets = []string{"nope/*.wasm"} }, "matches no file"},
 		{"asset under an excluded prefix", func(c *Config) { c.Assets = []string{"api/"} }, "excluded"},
@@ -200,6 +210,13 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	put(t, d, "playground/app.wasm", strings.Repeat("0123456789abcdef", 1<<16)) // 1 MiB
 	put(t, d, "playground/fonts/f.ttf", "font bytes")
 	put(t, d, "api/x", "{}")
+	// a second playground on the same origin: its own page, files, name,
+	// scope and worker; the kit checks that neither touches the other's cache
+	put(t, d, "b/index.html", strings.ReplaceAll(readFile(t, d, "playground/index.html"), "/playground/", "/b/"))
+	put(t, d, "b/app.wasm", strings.Repeat("fedcba9876543210", 1<<14))
+	if _, err := Generate(Config{Dir: d, Assets: []string{"b/index.html", "b/app.wasm"}, Scopes: []string{"/b/"}, Name: "the-other-playground"}); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm"}, Lazy: []string{"playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +224,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	if err := os.WriteFile(kit, Testkit(), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(node, kit, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--ready", "window.appReady===true")
+	cmd := exec.Command(node, kit, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--neighbour", "/b/", "--ready", "window.appReady===true")
 	b, err := cmd.CombinedOutput()
 	t.Logf("%s", b)
 	if err != nil || !strings.Contains(string(b), "WASMCACHE_OK") {

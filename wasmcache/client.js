@@ -44,7 +44,7 @@
     ko: { update: "새 버전이 있습니다.", reload: "새로 고침", later: "나중에" }
   };
   var here = document.currentScript && document.currentScript.src ? new URL(".", document.currentScript.src).pathname : "/";
-  var o = {}, st = "off", reg = null, running = "", shown = "", node = null;
+  var o = {}, st = "off", reg = null, running = "", shown = "", node = null, cname = "";
   var cachedP = Promise.resolve(false);
 
   function words() {
@@ -131,6 +131,7 @@
         if (!r.ok) { throw new Error("HTTP " + r.status); }
         return r.json();
       }).then(function (j) {
+        cname = j.name || "";
         if (!running) { running = j.version; } // first visit: the page is this deploy's
         if (j.version === running || j.version === shown) { return j.version !== running; }
         shown = j.version;
@@ -157,7 +158,7 @@
         // again for ever, so it goes, with its cache; the network answers
         var gone = reg ? reg.unregister() : Promise.resolve();
         return gone.then(function () { return window.caches ? caches.keys() : []; }).then(function (ks) {
-          return Promise.all(ks.filter(function (k) { return k.indexOf("wasmcache-") === 0; }).map(function (k) { return caches.delete(k); }));
+          return Promise.all(ks.filter(function (k) { return cname !== "" && k.indexOf(cname + "|") === 0; /* this playground's only */ }).map(function (k) { return caches.delete(k); }));
         });
       }).then(function () { location.reload(); }, function () { location.reload(); });
     },
