@@ -208,7 +208,6 @@ jobs:
           for want in \
             '<div class="commons-ribbon"><a href="https://en.wikipedia.org/wiki/Digital_commons" aria-label="Digital Commons">Digital Commons</a></div>' \
             '<details class="brand-menu">' \
-            '<li><a href="https://go-pdfkit.github.io">go-pdfkit</a></li>' \
             '<li><a href="https://go-slides.github.io">go-slides</a></li>' \
             '.commons-ribbon{position:absolute;top:0;right:0;' \
             '.brand-menu{position:relative}'; do
