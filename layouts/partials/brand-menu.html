@@ -67,7 +67,7 @@
 {{- if $sibs -}}
 <details class="brand-menu"><summary class="brand" aria-label="{{ i18n "kit_siblingSites" | safeHTML }}">{{ $mark }}{{ $ctx.Site.Title }}<span class="brand-caret" aria-hidden="true"></span></summary><ul>
   {{- range $sibs }}
-  <li><a href="{{ .url }}">{{ with .icon }}<img src="{{ . }}" width="20" height="20" alt="" aria-hidden="true">{{ end }}{{ .name }}</a></li>
+  <li><a href="{{ .url }}">{{ with .icon }}<img src="{{ . }}" width="20" height="20" alt="" aria-hidden="true">{{ end }}{{ .name }}{{ partial "icons/arrow-up-right.html" . }}</a></li>
   {{- end }}
 </ul></details>
 {{- else -}}

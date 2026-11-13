@@ -305,6 +305,11 @@ plain name it was. With one, the `<img>` is 20px — a menu row is not a masthea
 where it goes, and a screen reader announcing "go-pdfkit logo, go-pdfkit" says
 it twice.
 
+⭐ **Every row ends with an ↗ (v0.26.0)**, the Octicons `arrow-up-right`, to say
+the link leaves this site. It is `aria-hidden` for the same reason as the icon,
+and the kit draws no icon by hand: the glyph is copied verbatim from
+primer/octicons with the commit it came from, MIT, beside `OCTICONS-LICENSE`.
+
 ⛔ **The site's own home is not in the list (v0.25.0).** It was, on the
 reasoning that the title had been a link to `/` and should not silently lose
 it — but a reader is already on that page, and an entry that goes nowhere is
