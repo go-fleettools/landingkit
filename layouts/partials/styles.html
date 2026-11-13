@@ -181,7 +181,47 @@
        the byte-identical one it had before this existed — the same rule the
        mantra follows below, checked against the base branch in CI. */}}
   {{- with (.Site.Params.commons | default dict).url }}
-  .commons-ribbon{position:absolute;top:0;right:0;width:230px;height:230px;overflow:hidden;z-index:29;pointer-events:none}
+  {{- /* ⛔ THE BAND SAT 83px CLEAR OF THE FORK ONE, WHICH IS NOT A PAIR, IT IS
+       TWO DECORATIONS. Both bands rotate about their OWN centre, so how far
+       apart they look is not the difference of their `top` values — the boxes
+       are different sizes and each band is offset past its own right edge.
+
+       Taking x to the right and y down, with the page's right edge at W, a
+       band's centre is at
+
+           cx = W + rightOffset - width/2        (the BOX size drops out)
+           cy = top + height/2
+
+       and its distance from the page's top-right corner, along the normal to
+       a 45° line, is (W - cx + cy)/√2.
+
+           fork     (W - (W+36-100) + 48+15)/√2 = 127/√2 = 89.8px
+           before   (W - (W+36-200) + 108+15)/√2 = 287/√2 = 202.9px
+
+       113px between centres, 83px of empty page between the bands. Now
+       width 340, top 35:
+
+           after    (W - (W+36-170) + 35+15)/√2 = 184/√2 = 130.1px
+
+       40px between centres, and with a 30px band that is a 10px gap: a pair.
+
+       ⚠ AND THE BOX HAS TO HOLD THE WORDS. Three constraints at once, which
+       is why this is computed and not nudged:
+
+         - both ends of the band must leave the box, or they float
+           (the defect of v0.24.1)
+         - the band's centre must sit far enough from the corner to clear the
+           fork band, which is the fix above
+         - THE TEXT is centred on the band, so the box must contain that
+           centre ±39px — "Digital Commons" is about 110px at 13px, and
+           110/2·cos45 = 39 in each axis
+
+       A first attempt at this moved the band up and shrank the box to 165 to
+       keep the ends clipped; the band then read "gital Commons", because the
+       third constraint was not in the arithmetic. 155/55/300 satisfies all
+       three: centre at (41, 70) in the box, text within (2, 31)–(80, 109),
+       upper end at (-65, -36), lower end at (147, 176) past the bottom. */}}
+  .commons-ribbon{position:absolute;top:0;right:0;width:155px;height:155px;overflow:hidden;z-index:29;pointer-events:none}
   {{- /* ⛔ THE BAND IS 400px BECAUSE A ROTATED ONE IS MEASURED BEFORE IT TURNS.
        It was 260px and BOTH ITS ENDS STOPPED IN MID-AIR inside the box: a
        corner ribbon is only a ribbon because the box clips it, and one that
@@ -191,16 +231,19 @@
        edge, 260px reached 92px and fell 44px short. 400px reaches 141px and
        both ends leave the 230px box. The fork ribbon never showed this because
        its 200px in a 150px box is proportionally far longer. */}}
-  .commons-ribbon a{position:absolute;top:108px;right:-36px;width:400px;padding:7px 0;transform:rotate(45deg);
+  .commons-ribbon a{position:absolute;top:55px;right:-36px;width:300px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .commons-ribbon a:hover{filter:brightness(1.08)}
   .commons-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
-  {{- /* the bar keeps clear of the OUTER band now, which reaches further
-       across: the fork ribbon's 112px becomes 172px, and a phone's 84px
-       becomes 128px */}}
-  @media(max-width:1420px){.nav .wrap{padding-right:172px}}
-  @media(max-width:600px){.commons-ribbon{width:172px;height:172px}.commons-ribbon a{top:78px;right:-52px;font-size:11px;padding:5px 0;width:300px}.nav .wrap{padding-right:128px}}
+  {{- /* the bar keeps clear of the OUTER band, which reaches further across
+       than the fork one: its 112px becomes 128px for a 165px box, and a
+       phone's 84px becomes 104px for a 140px one */}}
+  @media(max-width:1420px){.nav .wrap{padding-right:120px}}
+  {{- /* the phone's pair, by the same arithmetic at the phone's sizes: the
+       fork band is 66.1px from the corner, this one 106.1px, and the words are
+       about 93px at 11px so the box must hold its centre ±33 */}}
+  @media(max-width:600px){.commons-ribbon{width:125px;height:125px}.commons-ribbon a{top:51px;right:-52px;font-size:11px;padding:5px 0;width:280px}.nav .wrap{padding-right:96px}}
   {{- end }}
   {{- /* The top bar's title as a menu of the organisation's other sites
        (brand-menu.html). Emitted only for a site with [[params.siblings]]:
@@ -231,7 +274,11 @@
   .brand-menu ul{position:absolute;top:calc(100% + 10px);left:-10px;z-index:40;margin:0;padding:6px;
     list-style:none;min-width:190px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);
     box-shadow:0 12px 28px -12px rgba(0,0,0,.45)}
-  .brand-menu li a{display:block;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--ink)}
+  {{- /* a row with an icon is a flex line so the mark and the name sit on one
+       baseline whether or not the entry has one; 20px, not the bar's 32,
+       because a menu row is not a masthead */}}
+  .brand-menu li a{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--ink)}
+  .brand-menu li img{width:20px;height:20px;border-radius:5px;flex:none}
   .brand-menu li a:hover{background:var(--chip-bg)}
   .brand-menu li a:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
   {{- end }}

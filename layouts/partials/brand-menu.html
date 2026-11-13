@@ -19,6 +19,18 @@
          [[params.siblings]]
            name = "go-pdfkit"
            url  = "https://go-pdfkit.github.io"
+           icon = "https://go-pdfkit.github.io/favicon.svg"
+
+     ⭐ THE ICON IS OPTIONAL AND DECORATIVE. An entry without one is the plain
+     name it was. With one, the <img> carries an EMPTY alt and aria-hidden: the
+     link's text already says where it goes, and a screen reader announcing
+     "go-pdfkit logo, go-pdfkit" says it twice. 20px, not the bar's 32: a menu
+     row is not a masthead.
+
+     ⛔ THE SITE'S OWN HOME IS NOT IN THE LIST. It was, on the reasoning that
+     the title had been a link to "/" and should not silently lose it — but a
+     reader is ALREADY on that page, and an entry that goes nowhere is one more
+     row to read past. Opening the menu is now what the title does.
 
      ⛔⛔ AND THE BAR'S LOGO IS NOT OPTIONAL DECORATION: v0.23.0 SHIPPED THIS
      PARTIAL UNABLE TO CARRY ONE. The example writes a bare title, so the
@@ -46,9 +58,7 @@
      JavaScript and this keeps it so: a disclosure opens on click and on Enter
      or Space, closes on Escape in every current browser, and is announced as
      a button with expanded state — the behaviour a hand-rolled menu has to
-     re-implement and usually half-implements. The first item is the site's own
-     home, which is what the title linked to before, so nothing the bar could
-     do is lost. */}}
+     re-implement and usually half-implements. */}}
 {{- $ctx := . }}{{ $glyph := "" }}{{ $glyphAlt := "" }}
 {{- if reflect.IsMap . }}{{ $ctx = .ctx }}{{ $glyph = .glyph | default "" }}{{ $glyphAlt = .glyphAlt | default "" }}{{ end }}
 {{- $sibs := $ctx.Site.Params.siblings }}
@@ -56,9 +66,8 @@
 {{- with $glyph }}{{ $mark = printf "<img class=\"glyph\" src=\"%s\" width=\"32\" height=\"32\" alt=\"%s\"> " (. | safeURL) ($glyphAlt | htmlEscape) | safeHTML }}{{ end }}
 {{- if $sibs -}}
 <details class="brand-menu"><summary class="brand" aria-label="{{ i18n "kit_siblingSites" | safeHTML }}">{{ $mark }}{{ $ctx.Site.Title }}<span class="brand-caret" aria-hidden="true"></span></summary><ul>
-  <li><a href="/">{{ $ctx.Site.Title }}</a></li>
   {{- range $sibs }}
-  <li><a href="{{ .url }}">{{ .name }}</a></li>
+  <li><a href="{{ .url }}">{{ with .icon }}<img src="{{ . }}" width="20" height="20" alt="" aria-hidden="true">{{ end }}{{ .name }}</a></li>
   {{- end }}
 </ul></details>
 {{- else -}}
