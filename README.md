@@ -950,6 +950,13 @@ What it does, and what it refuses:
   controls that path and no other (GitHub Pages cannot send
   `Service-Worker-Allowed`). It adds no header and changes none but
   `Content-Length`, `Content-Encoding` and `Transfer-Encoding`.
+- **The code is shared, the cache is not.** Each playground has its own `-name`
+  (default `wasmcache:<home>`), so its Cache Storage names are
+  `<name>|<build>`, its own scope and its own version file. A worker opens,
+  reads and deletes only caches that start with its own `<name>|` (`|` cannot be
+  in a name, so one name is never the prefix of another), and answers only its
+  own manifest. Two playgrounds on one `github.io` origin never read, rewrite
+  or delete each other's entries; the kit's `--neighbour <page>` asserts it.
 - A page that carries `?v=<version>` on its URLs (a deploy's commit) gets the
   cached copy only when the version is the worker's: a page of another deploy
   goes to the network.

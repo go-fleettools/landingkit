@@ -46,6 +46,7 @@ const verify = args.verify || "localStorage.getItem('wasmcache-kit')==='work'";
 const hooks = args.hooks ? require(path.resolve(args.hooks)) : {};
 const fail = (m) => { console.error("FAIL " + m); process.exit(1); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const canon = (o) => JSON.stringify(Object.keys(o).sort().map((k) => [k, o[k]]));
 const sha = (b) => crypto.createHash("sha256").update(b).digest("hex");
 
 // the manifest, as the generated worker holds it
@@ -96,7 +97,7 @@ const out = {};
     await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 }); // the page called start()
     return page;
   };
-  const cacheName = () => manifest.name + "-" + manifest.build;
+  const cacheName = () => manifest.name + "|" + manifest.build;
   const cacheHash = (page, p) => page.evaluate(async (n, p) => {
     const r = await (await caches.open(n)).match(p);
     if (!r) return null;
@@ -115,6 +116,24 @@ const out = {};
   const scopeSeen = await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).scope);
   if (scopeSeen !== base + scope) fail("the worker's scope is " + scopeSeen + ", not " + base + scope);
   out.firstVisit = keys.length + " files cached, scope " + scope;
+  // --neighbour <page>: another playground on this origin, with its own worker,
+  // name and files; it installs its cache now and must be left alone by this one
+  let neighbour = null;
+  if (args.neighbour) {
+    const nScope = args.neighbour, nm = JSON.parse(/const CONFIG = (\{.*\});/.exec(fs.readFileSync(path.join(root, nScope, "wasmcache-sw.js"), "utf8"))[1]);
+    if (nm.name === manifest.name) fail("the neighbour has the same cache name: " + nm.name);
+    const np = await ctx.newPage();
+    await np.goto(base + nScope, { waitUntil: "load" });
+    await np.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+    if ((await np.evaluate(() => wasmcache.cached())) !== true) fail("the neighbour did not cache");
+    const nCache = nm.name + "|" + nm.build;
+    const entries = {};
+    for (const f of nm.files.filter((f) => !f.lazy)) entries[f.path] = f.sha256;
+    neighbour = { cache: nCache, entries, files: nm.files };
+    const own = await np.evaluate(async (n) => { const c = await caches.open(n); const o = {}; for (const r of await c.keys()) { const b = await (await c.match(r)).arrayBuffer(); o[new URL(r.url).pathname] = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)), (x) => x.toString(16).padStart(2, "0")).join(""); } return o; }, nCache);
+    if (canon(own) !== canon(entries)) fail("the neighbour's cache is not what its manifest lists");
+    await np.close();
+  }
   await page.close();
 
   // 2. the second load asks the server for none of them
@@ -174,7 +193,14 @@ const out = {};
   const stored = await page.evaluate(async () => { const o = []; for (const k of await caches.keys()) for (const r of await (await caches.open(k)).keys()) o.push(new URL(r.url).pathname); return o; });
   const leaked = stored.filter((p) => p.startsWith(apiPrefix));
   if (leaked.length) fail("cached: " + leaked.join(", "));
-  const unlisted = stored.filter((p) => !manifest.files.some((f) => f.path === p));
+  // a file of the neighbouring playground is not this one's to serve: it goes to the network
+  if (neighbour) {
+    const np = Object.keys(neighbour.entries).find((p) => !manifest.files.some((f) => f.path === p));
+    hits = {};
+    await page.evaluate((u) => fetch(u), np);
+    if (!hits[np]) fail("this playground served the neighbour's " + np + " from a cache");
+  }
+  const unlisted = stored.filter((p) => !manifest.files.some((f) => f.path === p) && !(neighbour && p in neighbour.entries));
   if (unlisted.length) fail("the cache holds files the manifest does not list: " + unlisted.join(", "));
   out.api = apiPrefix + " reached the server every time, with and without Authorization; the cache holds only the manifest's files";
 
@@ -211,7 +237,24 @@ const out = {};
   }));
   if (info.version !== "bumped1") fail("the page runs " + info.version + " after accepting, not the new build");
   const names = await page.evaluate(() => caches.keys());
-  if (names.length !== 1 || names[0] !== manifest.name + "-bumped1") fail("old caches remain: " + names.join(", "));
+  const mine = names.filter((n) => n.startsWith(manifest.name + "|"));
+  if (mine.length !== 1 || mine[0] !== manifest.name + "|bumped1") fail("old caches remain: " + names.join(", "));
+  if (neighbour) {
+    // the other playground's cache is exactly as it was: not read, not deleted, not rewritten
+    const theirs = await page.evaluate(async (n) => {
+      const c = await caches.open(n), o = {};
+      for (const r of await c.keys()) {
+        const b = await (await c.match(r)).arrayBuffer();
+        o[new URL(r.url).pathname] = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", b)), (x) => x.toString(16).padStart(2, "0")).join("");
+      }
+      return o;
+    }, neighbour.cache);
+    if (canon(theirs) !== canon(neighbour.entries)) fail("the neighbouring playground's cache changed: " + JSON.stringify(theirs));
+    if (!names.includes(neighbour.cache)) fail("the neighbouring playground's cache is gone");
+    if (names.length !== mine.length + 1) fail("unexpected caches: " + names.join(", "));
+    out.neighbour = "a second playground on this origin (" + neighbour.cache + ") kept every entry untouched through this one's corruption, API traffic and update";
+  }
+  names.splice(0, names.length, ...mine);
   out.update = "accepted: reloaded into " + info.version + ", work kept, old cache deleted (" + names[0] + ")";
   await browser.close();
   server.close();

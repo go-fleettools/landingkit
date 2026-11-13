@@ -64,7 +64,9 @@ type Config struct {
 	// Version is the deploy's identity (a commit); the playground's pages
 	// carry it as ?v=. Empty: the build's content hash.
 	Version string
-	// Name prefixes the cache's name ("wasmcache").
+	// Name is this playground's own: its Cache Storage names are
+	// "<Name>|<build>", and its worker never touches a cache of another
+	// name. Default "wasmcache:<Home>", so playgrounds on one origin differ.
 	Name string
 	// Home is the directory the page script and the version file are
 	// written to, "/playground/" by default (the first scope).
@@ -91,9 +93,6 @@ type Manifest struct {
 // Generate writes the worker, the page script and the version file into
 // cfg.Dir and returns the manifest.
 func Generate(cfg Config) (*Manifest, error) {
-	if cfg.Name == "" {
-		cfg.Name = "wasmcache"
-	}
 	if len(cfg.Exclude) == 0 {
 		cfg.Exclude = []string{"/api/"}
 	}
@@ -105,6 +104,12 @@ func Generate(cfg Config) (*Manifest, error) {
 	}
 	if cfg.Home == "" {
 		cfg.Home = cfg.Scopes[0]
+	}
+	if cfg.Name == "" {
+		cfg.Name = "wasmcache:" + cfg.Home // one playground, one name: its home
+	}
+	if strings.Contains(cfg.Name, "|") {
+		return nil, fmt.Errorf("wasmcache: the name %q must not hold a |, which ends a name in Cache Storage", cfg.Name)
 	}
 	for _, s := range append([]string{cfg.Home}, cfg.Scopes...) {
 		if !strings.HasPrefix(s, "/") || !strings.HasSuffix(s, "/") || strings.Contains(s, "..") {

@@ -21,7 +21,11 @@
 "use strict";
 
 const CONFIG = /*WASMCACHE_CONFIG*/{};
-const CACHE = CONFIG.name + "-" + CONFIG.build;
+// "|" cannot be in a name (Generate refuses it), so one playground's prefix is
+// never the start of another's, and this worker only ever opens, reads or
+// deletes caches that begin with ITS name: two playgrounds on one origin
+// share the code, never an entry.
+const CACHE = CONFIG.name + "|" + CONFIG.build;
 const FILES = new Map(CONFIG.files.map((f) => [f.path, f]));
 const HEX = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
 const sha256 = async (buf) => HEX(await crypto.subtle.digest("SHA-256", buf));
@@ -89,7 +93,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil((async () => {
     for (const k of await caches.keys()) {
-      if (k.startsWith(CONFIG.name + "-") && k !== CACHE) {
+      if (k.startsWith(CONFIG.name + "|") && k !== CACHE) {
         await caches.delete(k);
       }
     }
