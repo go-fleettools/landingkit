@@ -246,3 +246,47 @@ func TestLinksUnreadableFile(t *testing.T) {
 		t.Fatalf("exit %d: %s", code, errs)
 	}
 }
+
+// ⛔ THE CHECKER SAYS WHO IT IS, OR WIKIPEDIA ANSWERS 403 AND THE LANE READS IT
+// AS A BROKEN LINK. Go's client sends `Go-http-client/2.0`, which Wikimedia's
+// user-agent policy refuses outright; go-tex.github.io#255 went red on
+// https://en.wikipedia.org/wiki/Digital_commons while the same URL answered 200
+// to curl. A link check that cannot tell "refused me" from "does not exist" is
+// a lane people learn to ignore.
+//
+// The server here stands in for such a host: it refuses the default UA and
+// serves the named one, so the test fails if the header stops being sent.
+func TestTheCheckerNamesItselfToHostsThatRefuseLibraryDefaults(t *testing.T) {
+	var got string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("User-Agent")
+		if strings.HasPrefix(got, "Go-http-client") || got == "" {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
+	defer srv.Close()
+
+	code, _, _ := status(srv.Client(), srv.URL)
+	if code != http.StatusOK {
+		t.Errorf("status = %d, want 200: the host refused the user agent %q", code, got)
+	}
+	// ⚠ AND IT NAMES THE PROGRAM AND ITS REPOSITORY, NOTHING ELSE. A header a
+	// landing's CI sends to every host it links to is no place for a person's
+	// name, address or machine.
+	if !strings.HasPrefix(got, "landingkit-links/") {
+		t.Errorf("user agent = %q, want one naming this program", got)
+	}
+	if !strings.Contains(got, "github.com/go-fleettools/landingkit") {
+		t.Errorf("user agent = %q, want a way to make contact: the repository", got)
+	}
+}
+
+// A URL the request builder itself rejects is no answer at all, not a 0 with a
+// panic behind it.
+func TestAnUnbuildableRequestIsNoAnswer(t *testing.T) {
+	if code, ra, had := status(http.DefaultClient, "://not a url"); code != 0 || ra != 0 || had {
+		t.Errorf("status(bad url) = %d, %v, %v; want 0, 0, false", code, ra, had)
+	}
+}

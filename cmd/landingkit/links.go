@@ -44,6 +44,23 @@ var (
 	sleep   = time.Sleep
 )
 
+// ⛔ A CHECKER THAT DOES NOT SAY WHO IT IS GETS 403 FROM WIKIPEDIA, and a 403
+// here reads as "this link is broken" — it is not, the page opens in any
+// browser. Go's client sends `Go-http-client/2.0`, and Wikimedia's user-agent
+// policy refuses a generic library default outright. go-tex.github.io#255 went
+// red on https://en.wikipedia.org/wiki/Digital_commons for exactly this, while
+// the same URL answered 200 to curl.
+//
+// This is the second host that needs handling rather than believing: github.com
+// answers a blob page with 503 (see the probe rewrite above). The difference is
+// that one lies about availability and this one asks to be told who is calling.
+//
+// ⚠ IT NAMES THE PROGRAM AND ITS REPOSITORY, AND NOTHING ELSE. Wikimedia asks
+// for a way to make contact; a project URL is that, and no person's name,
+// address or machine belongs in a header a landing's CI sends to every host it
+// links to.
+const userAgent = "landingkit-links/1 (+https://github.com/go-fleettools/landingkit)"
+
 // probe is the URL actually fetched for u.
 func probe(u string) string {
 	rest, ok := strings.CutPrefix(u, "https://github.com/")
@@ -92,7 +109,12 @@ func siteURLs(dir string) ([]string, error) {
 // was no answer at all (curl's 000), and the wait the server asked for in a
 // Retry-After header (0 when it gave none).
 func status(c *http.Client, u string) (code int, ra time.Duration, had bool) {
-	resp, err := c.Get(u)
+	req, err := http.NewRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return 0, 0, false
+	}
+	req.Header.Set("User-Agent", userAgent)
+	resp, err := c.Do(req)
 	if err != nil {
 		return 0, 0, false
 	}
