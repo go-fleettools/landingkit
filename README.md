@@ -890,6 +890,84 @@ of `api.github.com/orgs/<org>/repos`, or a data file a workflow refreshes),
 so that the one list a landing legitimately shows comes from its source on
 every deploy instead of from a copy.
 
+## An offline cache for a playground's wasm: `landingkit wasmcache`
+
+A playground's wasm is tens of megabytes; a returning visitor should not
+download it again, and should be told, not surprised, when a newer deploy is
+out. The `wasmcache` package and `landingkit wasmcache` command are that,
+once, for every playground (a Hugo landing's, or any other static site).
+
+Run it on the BUILT site, after the step that writes the pages:
+
+```sh
+landingkit wasmcache -dir public -version "$GITHUB_SHA" \
+  -scope /playground/ -scope /fr/playground/ \
+  -asset 'playground/*.wasm' -asset playground/wasm_exec.js -asset playground/fonts/ \
+  -asset playground/index.html -asset fr/playground/index.html \
+  -exclude /api/
+```
+
+It writes, per scope, `wasmcache-sw.js` (the worker, the manifest and the
+SHA-256 of every file inside it), and in the home directory (the first scope
+by default) `wasmcache-client.js` and `wasmcache.json` (the version file). The
+page adds `<script src="/playground/wasmcache-client.js"></script>` and, once
+the app is ready, `if (globalThis.wasmcache) wasmcache.start({ lang, beforeReload })`.
+`beforeReload` returns a promise that saves the user's work; the reload waits
+for it. A site built without the step has no script and no worker: nothing
+changes.
+
+What it does, and what it refuses:
+
+- **First visit**: the page downloads as it always did; then the worker
+  stores each listed file under `<name>-<build>`, each checked against its
+  hash (the HTTP cache answers first, so the wasm is not downloaded twice).
+- **Later visits**: the listed files, the page included, come from the cache
+  with no request. The hash is checked again on every read: a corrupt or
+  truncated entry is deleted, the network answers, and the entry is rewritten.
+  It never breaks the page.
+- **A newer deploy**: the page asks `wasmcache.json` (`cache: no-store`) at
+  start, when the tab becomes visible and every ten minutes, and compares its
+  `version` with the running one. If it differs the new worker installs beside
+  the old and a non-blocking prompt (`role="status"`, fixed corner, English,
+  French, German, Spanish, Italian, Portuguese, Polish, Russian, Ukrainian,
+  Chinese, Japanese, Korean; `strings` overrides it) offers Reload. Nothing
+  reloads by itself. Reload runs `beforeReload`, switches workers and
+  reloads; the old build's cache is deleted when the new one activates. If
+  the new worker cannot install, Reload unregisters the old one and its cache
+  so the network answers.
+- **Never**: the worker answers only a GET for a path in the manifest. An
+  `-exclude` prefix (`/api/` by default) is never listed (generation fails if
+  an asset is under one); a request with an `Authorization` header, a Range
+  request, a POST and any other origin pass through untouched, with no
+  `respondWith`. Files are fetched without credentials, and a redirect, an
+  opaque or a non-200 answer fails the install, so a page behind a login is
+  never stored.
+- **Scope**: one worker per `-scope`, served from that directory, so it
+  controls that path and no other (GitHub Pages cannot send
+  `Service-Worker-Allowed`). It adds no header and changes none but
+  `Content-Length`, `Content-Encoding` and `Transfer-Encoding`.
+- A page that carries `?v=<version>` on its URLs (a deploy's commit) gets the
+  cached copy only when the version is the worker's: a page of another deploy
+  goes to the network.
+
+`landingkit wasmcache testkit -out kit` writes `wasmcache-e2e.cjs`, the
+browser tests (headless Chrome through `puppeteer-core`, like the other
+`*.cjs`) a playground runs in its own CI against its built site:
+
+```sh
+CHROME=... NODE_PATH=.../node_modules node kit/wasmcache-e2e.cjs \
+  --root public --page /playground/ --scope /playground/ \
+  --asset /playground/playground.wasm --api /api/git/ --ready 'globalThis.appReady'
+```
+
+It checks the first visit and the scope, that the second load asks the server
+for none of the cached files, that a corrupt and a truncated entry fall back
+to the network and are repaired, that `/api/*` (with and without
+`Authorization`) is never cached, that a bumped version shows the prompt in
+12 languages without reloading, and that accepting it lands in the new build
+with the work kept (`--prepare` and `--verify` take JS for the app's own
+work) and the old cache gone. This repository runs it on a fixture site.
+
 ## Licence
 
 BSD-3-Clause. The Octicons in `layouts/partials/icons/` are MIT, see
