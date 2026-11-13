@@ -1,0 +1,27 @@
+{{/* The "Digital Commons" corner ribbon: a SECOND band in the same top-right
+     corner as fork-ribbon.html, outside it and at the same 45°, so the two
+     read as a pair rather than as two unrelated decorations. "Fork me on
+     GitHub" says the code can be taken; this says what it is taken into.
+
+     ⛔ IT IS OPT-IN, AND SILENT WHEN UNSET. A landing that sets no
+     [params.commons] url gets nothing here and NO extra rule in the
+     stylesheet (styles.html guards the block on the same param), so every
+     site that has not asked for it builds byte for byte what it built before
+     this partial existed. That is the kit's standing rule for anything new,
+     and CI checks it against the base branch.
+
+     Called with the page: {{ partial "commons-ribbon.html" . }}, and
+     configured by the site:
+
+         [params.commons]
+           url = "https://en.wikipedia.org/wiki/Digital_commons"
+
+     ⚠ THE URL IS THE SITE'S, NOT THE KIT'S. The kit ships no default link:
+     a ribbon that silently pointed somewhere nobody chose would put a
+     destination on twelve organisations' landings that none of them wrote
+     down. What the kit mutualises is the band and its geometry. */}}
+{{- $url := "" }}
+{{- with .Site.Params.commons }}{{ $url = .url | default "" }}{{ end }}
+{{- with $url }}
+<div class="commons-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_digitalCommons" | safeHTML }}">{{ i18n "kit_digitalCommons" | safeHTML }}</a></div>
+{{- end -}}

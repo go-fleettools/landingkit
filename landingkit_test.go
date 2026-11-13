@@ -54,6 +54,65 @@ func TestNoPartialEndsWithANewline(t *testing.T) {
 	}
 }
 
+// ⛔ THE TWO OPT-IN ADDITIONS MUST BE SILENT FOR EVERY SITE THAT DID NOT ASK.
+// Twelve organisations build this kit; a landing that sets neither
+// [params.commons] nor [[params.siblings]] has to render the page and the
+// stylesheet it rendered before they existed. CI proves it by building the
+// example against the base branch and comparing bytes; this says the same
+// thing one layer down, where it is cheap and runs on every change.
+func TestTheNewPartialsAreOptIn(t *testing.T) {
+	// The ribbon writes nothing without the param, and the menu falls back to
+	// the exact anchor the layouts used to write by hand.
+	contract(t, "layouts/partials/commons-ribbon.html", []string{
+		`{{- with $url }}`, // nothing at all when it is empty
+		`class="commons-ribbon"`,
+		`{{ i18n "kit_digitalCommons" | safeHTML }}`,
+	})
+	contract(t, "layouts/partials/brand-menu.html", []string{
+		`{{- if $sibs -}}`,
+		`<a class="brand" href="/">{{ .Site.Title }}</a>`, // byte for byte the old line
+		`<details class="brand-menu">`,
+		`{{ i18n "kit_siblingSites" | safeHTML }}`,
+	})
+
+	// ⛔ AND THE SHEET'S NEW RULES ARE GUARDED BY THE SAME PARAMS. A rule
+	// emitted unconditionally would move every organisation's stylesheet, and
+	// `landingkit verify` compares the <style> block as text: every landing
+	// would fail against the reference until it rebuilt.
+	s := contract(t, "layouts/partials/styles.html", []string{
+		`{{- with (.Site.Params.commons | default dict).url }}`,
+		`.commons-ribbon{position:absolute;top:0;right:0;`,
+		`{{- with .Site.Params.siblings }}`,
+		`.brand-menu{position:relative}`,
+	})
+	// Each guarded block must CLOSE before the mantra's, or the mantra would
+	// be emitted only for a site that set these params.
+	for _, rule := range []string{".commons-ribbon{", ".brand-menu{", ".brand-caret{"} {
+		i := strings.Index(s, rule)
+		if i < 0 {
+			t.Fatalf("%s is not in the sheet", rule)
+		}
+		if !strings.Contains(s[:i], "{{- with ") {
+			t.Errorf("%s is emitted with no `with` guard before it", rule)
+		}
+	}
+	// ⛔ The second band is PARALLEL to the first: same corner, same rotation.
+	// A different angle is the one thing that would make them read as two
+	// unrelated decorations, and it is a single character to get wrong.
+	for _, want := range []string{
+		".fork-ribbon a{position:absolute;top:48px;right:-36px;",
+		".commons-ribbon a{position:absolute;top:108px;right:-36px;",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("the sheet lacks %q", want)
+		}
+	}
+	if strings.Count(s, "transform:rotate(45deg)") != 2 {
+		t.Errorf("the two bands do not both rotate 45deg: %d occurrence(s)",
+			strings.Count(s, "transform:rotate(45deg)"))
+	}
+}
+
 // contract checks that a partial still says what its README promises.
 func contract(t *testing.T, file string, wants []string) string {
 	t.Helper()

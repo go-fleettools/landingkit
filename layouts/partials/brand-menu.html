@@ -1,0 +1,40 @@
+{{/* The top bar's title, with an optional menu of the organisation's other
+     sites hanging from it.
+
+     ⛔ WITH NO [[params.siblings]] IT IS THE ANCHOR THE LAYOUTS WROTE BY HAND,
+     character for character:
+
+         <a class="brand" href="/">{{ .Site.Title }}</a>
+
+     so a landing can call this partial instead of writing that line and its
+     page does not move by a byte. styles.html guards the menu's rules on the
+     same param, so the stylesheet does not move either. CI checks both against
+     the base branch.
+
+     ⚠ THE SITES ARE THE LANDING'S OWN. The kit ships no list: which sites are
+     siblings is a fact about an organisation, not about the kit, and a default
+     would put one organisation's neighbours on another's bar. Configured by
+     the site:
+
+         [[params.siblings]]
+           name = "go-pdfkit"
+           url  = "https://go-pdfkit.github.io"
+
+     ⭐ IT IS A <details>, NOT A SCRIPT. The bar already works without
+     JavaScript and this keeps it so: a disclosure opens on click and on Enter
+     or Space, closes on Escape in every current browser, and is announced as
+     a button with expanded state — the behaviour a hand-rolled menu has to
+     re-implement and usually half-implements. The first item is the site's own
+     home, which is what the title linked to before, so nothing the bar could
+     do is lost. */}}
+{{- $sibs := .Site.Params.siblings }}
+{{- if $sibs -}}
+<details class="brand-menu"><summary class="brand" aria-label="{{ i18n "kit_siblingSites" | safeHTML }}">{{ .Site.Title }}<span class="brand-caret" aria-hidden="true"></span></summary><ul>
+  <li><a href="/">{{ .Site.Title }}</a></li>
+  {{- range $sibs }}
+  <li><a href="{{ .url }}">{{ .name }}</a></li>
+  {{- end }}
+</ul></details>
+{{- else -}}
+<a class="brand" href="/">{{ .Site.Title }}</a>
+{{- end -}}

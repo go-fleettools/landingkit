@@ -186,6 +186,41 @@ jobs:
             fi
           done
           echo "the line reaches the page; an unknown and a repeated GOARCH are refused"
+      # The Digital Commons band and the title's menu of sibling sites: both
+      # opt-in, both silent unless the site asks. Configured, they reach the
+      # page AND the stylesheet; unset, the step after this one proves the
+      # built site is the base branch's byte for byte.
+      - name: the second band and the title menu reach a page that asks for them
+        run: |
+          cat > "$RUNNER_TEMP/commons.toml" <<'TOML'
+          [params.commons]
+            url = "https://en.wikipedia.org/wiki/Digital_commons"
+          [[params.siblings]]
+            name = "go-pdfkit"
+            url  = "https://go-pdfkit.github.io"
+          [[params.siblings]]
+            name = "go-slides"
+            url  = "https://go-slides.github.io"
+          TOML
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/commons.toml" --destination "$RUNNER_TEMP/commons")
+          page="$RUNNER_TEMP/commons/index.html"
+          for want in \
+            '<div class="commons-ribbon"><a href="https://en.wikipedia.org/wiki/Digital_commons" aria-label="Digital Commons">Digital Commons</a></div>' \
+            '<details class="brand-menu">' \
+            '<li><a href="https://go-pdfkit.github.io">go-pdfkit</a></li>' \
+            '<li><a href="https://go-slides.github.io">go-slides</a></li>' \
+            '.commons-ribbon{position:absolute;top:0;right:0;' \
+            '.brand-menu{position:relative}'; do
+            grep -qF -- "$want" "$page" || { echo "::error::$want is not in the page"; exit 1; }
+          done
+          # ⛔ THE TWO BANDS MUST BE PARALLEL, which is the whole point of the
+          # second one: same corner, same rotation, different distance from it.
+          test "$(grep -c -F 'transform:rotate(45deg)' "$page")" = 2 \
+            || { echo "::error::the two bands do not both rotate 45deg"; exit 1; }
+          # the menu keeps a link to the site's own home, which the plain title was
+          grep -qF -- '<li><a href="/">landingkit example</a></li>' "$page" \
+            || { echo "::error::the menu lost the link the title used to be"; exit 1; }
+          echo "the band and the menu reach the page, and the bands are parallel"
       # A landing's own mention of the licence shows only without the strip:
       # mantra-on.html answers for both.
       - name: the landing's own licence line, only without the strip
@@ -229,6 +264,21 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: base
+      # ⛔ A SITE THAT ASKS FOR NEITHER THE BAND NOR THE MENU IS UNCHANGED, page
+      # and stylesheet. Twelve organisations build this kit and `landingkit
+      # verify` compares the <style> block as TEXT: a rule emitted
+      # unconditionally would fail every one of them against the reference
+      # until it rebuilt. Only meaningful while the base lacks the partials;
+      # said, not hidden, after.
+      - name: neither configured, every page is the base's byte for byte
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f base/layouts/partials/commons-ribbon.html ]; then
+            echo "the base already has the band: nothing pre-band to compare with"; exit 0
+          fi
+          (cd base/example && hugo --destination "$RUNNER_TEMP/base-commons")
+          diff -r "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/example"
+          echo "every page of example/ is the base's, byte for byte"
       - name: the mantra off, the page is the pre-mantra base's byte for byte
         if: github.event_name == 'pull_request'
         run: |

@@ -9,10 +9,17 @@
 </head>
 <body class="lm">
 <header class="nav"><div class="wrap nav-in">
-  <a class="brand" href="/">{{ .Site.Title }}</a>
+  {{ partial "brand-menu.html" . }}
   {{ partial "theme-toggle.html" . }}
 </div></header>
-{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}
+{{/* ⛔ THE TWO BANDS ARE WRITTEN WITH NO SEPARATOR BETWEEN THEM. commons-ribbon
+     emits NOTHING without [params.commons] url, and emits its own leading
+     newline when it emits anything — so on its own line it would leave a blank
+     one behind when unset, and this page would no longer be the byte-identical
+     page a site that asked for nothing used to get. A comment emits nothing
+     but its own trailing newline, which is why this one ends with `-}}`: the
+     blank line it left behind was itself a byte of difference. */ -}}
+{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}{{ partial "commons-ribbon.html" . }}
 <main>
   <section class="hero"><div class="wrap">
     <h1 class="head">One stylesheet</h1>
