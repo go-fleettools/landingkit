@@ -25,6 +25,7 @@ const usage = `usage:
   landingkit check  <built-site-dir>           fails when the footer or hero sub-text repeats what the mantra strip says, or the hero's buttons are out of the kit's order (docs, try, rest)
   landingkit contrast <background> <fg>...     the WCAG 2.2 ratio of each foreground on that background
   landingkit audit  <https-url>...             check's rules on PUBLISHED landings: one verdict per page (ok, DRIFT, UNREAD)
+  landingkit wasmcache [flags]                 an offline cache and update prompt for a playground's wasm (see wasmcache/)
 
 run 'landingkit verify -h' for the verify flags
 `
@@ -52,6 +53,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return cmdContrast(args[1:], stdout, stderr)
 	case "audit":
 		return cmdAudit(args[1:], stdout, stderr)
+	case "wasmcache":
+		return cmdWasmcache(args[1:], stdout, stderr)
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
