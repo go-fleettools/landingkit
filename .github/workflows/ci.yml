@@ -221,6 +221,28 @@ jobs:
           grep -qF -- '<li><a href="/">landingkit example</a></li>' "$page" \
             || { echo "::error::the menu lost the link the title used to be"; exit 1; }
           echo "the band and the menu reach the page, and the bands are parallel"
+      # ⛔ THE MENU MUST CARRY THE BAR'S LOGO. v0.23.0 shipped it writing the
+      # title and nothing else, because this example's bar is a bare title and
+      # that looked finished; the first landing to adopt it has an
+      # <img class="glyph"> in front of the name and would have LOST it.
+      - name: the title menu carries a logo when the landing has one
+        run: |
+          cat > "$RUNNER_TEMP/glyph.toml" <<'TOML'
+          [params]
+            brandGlyph    = "/favicon.svg"
+            brandGlyphAlt = "landingkit logo"
+          [[params.siblings]]
+            name = "go-pdfkit"
+            url  = "https://go-pdfkit.github.io"
+          TOML
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/glyph.toml" --destination "$RUNNER_TEMP/glyph")
+          grep -qF -- '<img class="glyph" src="/favicon.svg" width="32" height="32" alt="landingkit logo"> landingkit example' \
+            "$RUNNER_TEMP/glyph/index.html" \
+            || { echo "::error::the logo is not in the menu's summary"; exit 1; }
+          # and with no glyph configured the bar is what it was: the step above
+          # built the same layout through the same dict and the base comparison
+          # covers it
+          echo "the logo reaches the bar through the menu"
       # A landing's own mention of the licence shows only without the strip:
       # mantra-on.html answers for both.
       - name: the landing's own licence line, only without the strip
