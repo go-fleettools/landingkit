@@ -161,7 +161,13 @@
        with the page; the nav bar keeps clear of it until the window is wide
        enough for the 1120px column to stop short of the corner. */}}
   .fork-ribbon{position:absolute;top:0;right:0;width:150px;height:150px;overflow:hidden;z-index:30;pointer-events:none}
-  .fork-ribbon a{position:absolute;top:48px;right:-36px;width:200px;padding:7px 0;transform:rotate(45deg);
+  {{- /* `right:-46px` rather than -36: the band's right edge sits 46px past
+       the box's, which slides the whole band toward the corner — further
+       right, which is what it is for. It moves the band from 89.8px to 82.7px
+       from the corner by the measure in the second band's comment below, so
+       the two are 17px apart rather than 10px; the pair still reads as a pair
+       and the test that refuses "clear across the corner" bounds it at 40. */}}
+  .fork-ribbon a{position:absolute;top:48px;right:-46px;width:200px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .fork-ribbon a:hover{filter:brightness(1.08)}
@@ -231,7 +237,19 @@
        edge, 260px reached 92px and fell 44px short. 400px reaches 141px and
        both ends leave the 230px box. The fork ribbon never showed this because
        its 200px in a 150px box is proportionally far longer. */}}
-  .commons-ribbon a{position:absolute;top:55px;right:-36px;width:300px;padding:7px 0;transform:rotate(45deg);
+  {{- /* ⛔ THE TEXT IS CENTRED ON THE VISIBLE CHORD, NOT ON THE ELEMENT, and
+       those are different places. `text-align:center` centres on the 300px
+       band; what a reader sees is the part of that band left INSIDE the box
+       after clipping, and the band is deliberately longer than the box at both
+       ends. Walking the axis from the centre (41, 70), the band is inside
+       [0,155]² for t from -58 (it leaves through the left edge) to +120 (it
+       leaves through the bottom), so the visible middle is at t = +31 and the
+       text sat 31px short of it, toward the top-left.
+       62px of padding-left moves the text's centre by half of it: the content
+       box starts 62px in and is 238 wide, so its middle is at 62+119 = 181
+       rather than 150. box-sizing is border-box here, so the element's own
+       geometry — and every clipping number above — is untouched. */}}
+  .commons-ribbon a{position:absolute;top:55px;right:-36px;width:300px;padding:7px 0 7px 62px;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .commons-ribbon a:hover{filter:brightness(1.08)}
