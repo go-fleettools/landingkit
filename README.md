@@ -289,6 +289,7 @@ in place of `<a class="brand" href="/">{{ .Site.Title }}</a>`.
 [[params.siblings]]
   name = "go-pdfkit"
   url  = "https://go-pdfkit.github.io"
+  icon = "https://go-pdfkit.github.io/favicon.svg"   # optional (v0.25.0)
 
 [[params.siblings]]
   name = "go-slides"
@@ -297,6 +298,17 @@ in place of `<a class="brand" href="/">{{ .Site.Title }}</a>`.
 
 With no `[[params.siblings]]` it IS that anchor, character for character, so a
 landing can adopt the partial before it has anything to list.
+
+⭐ **`icon` is optional and decorative (v0.25.0).** An entry without one is the
+plain name it was. With one, the `<img>` is 20px — a menu row is not a masthead
+— and carries an empty `alt` with `aria-hidden`: the link's text already says
+where it goes, and a screen reader announcing "go-pdfkit logo, go-pdfkit" says
+it twice.
+
+⛔ **The site's own home is not in the list (v0.25.0).** It was, on the
+reasoning that the title had been a link to `/` and should not silently lose
+it — but a reader is already on that page, and an entry that goes nowhere is
+one more row to read past. Opening the menu is what the title does now.
 
 ⛔ **A bar with a logo passes it in (v0.24.0).** v0.23.0 shipped this partial
 writing the title and nothing else — the example's bar is a bare title, so that

@@ -124,19 +124,67 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	// ⛔ The second band is PARALLEL to the first: same corner, same rotation.
 	// A different angle is the one thing that would make them read as two
 	// unrelated decorations, and it is a single character to get wrong.
-	for _, want := range []string{
-		".fork-ribbon a{position:absolute;top:48px;right:-36px;",
-		".commons-ribbon a{position:absolute;top:108px;right:-36px;",
-	} {
-		if !strings.Contains(s, want) {
-			t.Errorf("the sheet lacks %q", want)
-		}
+	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:48px;right:-36px;") {
+		t.Error("the fork band's geometry moved: the second band is placed against it")
 	}
+	assertTheBandsReadAsAPair(t, s)
 	if strings.Count(s, "transform:rotate(45deg)") != 2 {
 		t.Errorf("the two bands do not both rotate 45deg: %d occurrence(s)",
 			strings.Count(s, "transform:rotate(45deg)"))
 	}
 	assertTheBandIsClipped(t, s)
+}
+
+// ⛔ "LE BANDEAU DIGITAL COMMONS EST TROP BAS" — v0.24.x put 83px of empty page
+// between the two bands, which is not a pair, it is two decorations that happen
+// to share a corner.
+//
+// ⚠ AND THE GAP IS NOT THE DIFFERENCE OF THEIR `top` VALUES. Each band rotates
+// about its OWN centre, the boxes are different sizes, and each is offset past
+// its own right edge. What separates them is the distance from the page's
+// top-right corner along the normal to a 45° line:
+//
+//	cx = W + rightOffset - width/2   (the BOX size drops out entirely)
+//	cy = top + height/2
+//	d  = (W - cx + cy) / √2
+//
+// fork 89.8px, band 130.1px, so 40px between centres and, with a 30px band,
+// about 10px of page between them.
+//
+// The bound is generous on purpose: this refuses "clear across the corner",
+// not a few pixels of taste.
+func assertTheBandsReadAsAPair(t *testing.T, sheet string) {
+	t.Helper()
+	const bandH = 30
+	dist := func(sel, what string) float64 {
+		re := regexp.MustCompile(sel + ` a\{position:absolute;top:(\d+)px;right:-(\d+)px;width:(\d+)px`)
+		m := re.FindStringSubmatch(sheet)
+		if m == nil {
+			t.Fatalf("the sheet does not state the %s band's geometry", what)
+		}
+		var top, right, width float64
+		for i, p := range []*float64{&top, &right, &width} {
+			v, err := strconv.ParseFloat(m[i+1], 64)
+			if err != nil {
+				t.Fatalf("%s: %v", what, err)
+			}
+			*p = v
+		}
+		// W cancels: (W - (W + right - width/2) + top + bandH/2) / √2
+		return (width/2 - right + top + bandH/2) / math.Sqrt2
+	}
+	fork := dist(`\.fork-ribbon`, "fork")
+	commons := dist(`\.commons-ribbon`, "Digital Commons")
+	gap := commons - fork - bandH
+	if gap < 0 {
+		t.Errorf("the bands overlap: fork %.1fpx from the corner, the second %.1fpx",
+			fork, commons)
+	}
+	if gap > 40 {
+		t.Errorf("the second band sits %.0fpx of empty page clear of the fork one "+
+			"(fork %.1f, band %.1f from the corner): they read as two decorations, "+
+			"not as a pair", gap, fork, commons)
+	}
 }
 
 // ⛔⛔ A CORNER RIBBON IS ONLY A RIBBON BECAUSE THE BOX CLIPS IT, and v0.23.0's
@@ -148,14 +196,18 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 // turns, which is the trap. With the centre 136px from the box's left edge,
 // 260px reached 92px and fell 44px short.
 //
-// This checks the LEFT end, which is the one that must leave the box
-// horizontally. The right end leaves through the BOTTOM edge, which depends on
-// the band's rendered height and so is not computed here; the screenshot is
-// what confirms that one.
+// ⛔⛔ AND IT CHECKS BOTH ENDS SINCE v0.25.0, BECAUSE FIXING THE OTHER COMPLAINT
+// RE-MADE THIS ONE. The band was moved UP to sit beside the fork band instead
+// of 83px clear of it, and that pulled its lower end back INSIDE the box it had
+// been leaving. The first version of this test looked only at the left end and
+// would have passed. The box shrank to 165 in the same change, which is what
+// makes the lower end leave through the BOTTOM edge.
 //
-// ⚠ IT IS COMPUTED FROM THE SHEET'S OWN NUMBERS, not compared with 400. A test
-// that asserted the literal would pass for a box that had been resized under
-// it, which is exactly the drift this guards.
+// ⚠ IT IS COMPUTED FROM THE SHEET'S OWN NUMBERS, never compared with a
+// literal. A test asserting 340 would pass for a box resized under it, which is
+// exactly the drift this guards. The band's HEIGHT is the one number taken on
+// trust: 7px of padding each side around a 13px line is about 30px, and the
+// assertion has 10px of margin for it.
 func assertTheBandIsClipped(t *testing.T, sheet string) {
 	t.Helper()
 	num := func(re, what string) float64 {
@@ -170,18 +222,54 @@ func assertTheBandIsClipped(t *testing.T, sheet string) {
 		return v
 	}
 	boxW := num(`\.commons-ribbon\{position:absolute;top:0;right:0;width:(\d+)px`, "box width")
-	bandW := num(`\.commons-ribbon a\{position:absolute;top:\d+px;right:-\d+px;width:(\d+)px`, "band width")
+	bandW := num(`\.commons-ribbon a\{position:absolute;top:(?:\d+)px;right:-\d+px;width:(\d+)px`, "band width")
 	rightOff := num(`\.commons-ribbon a\{position:absolute;top:\d+px;right:-(\d+)px`, "right offset")
+	top := num(`\.commons-ribbon a\{position:absolute;top:(\d+)px`, "top")
+
+	const bandH = 30 // 7px padding either side of a 13px line
 
 	// the band's centre, in box coordinates: its right edge sits rightOff past
-	// the box's right edge
+	// the box's right edge, and rotation is about that centre
 	centreX := boxW + rightOff - bandW/2
+	centreY := top + bandH/2
 	reach := bandW / 2 * math.Cos(math.Pi/4)
-	if leftEnd := centreX - reach; leftEnd >= 0 {
-		t.Errorf("the band's left end stops %0.f px INSIDE the box (box %0.f, band %0.f, "+
-			"right -%0.f): it must be clipped by the edge, not float. A band of %0.f px "+
-			"would reach it.",
-			leftEnd, boxW, bandW, rightOff, (boxW+rightOff)/(0.5+math.Cos(math.Pi/4)/2))
+
+	// ⛔ THE UPPER END leaves through the box's left or top edge.
+	if x, y := centreX-reach, centreY-reach; x >= 0 && y >= 0 {
+		t.Errorf("the band's upper end stops inside the box at (%.0f, %.0f) "+
+			"(box %.0f, band %.0f, top %.0f, right -%.0f): it must be clipped by an "+
+			"edge, not float",
+			x, y, boxW, bandW, top, rightOff)
+	}
+	// ⛔ AND THE LOWER END through the right or bottom edge. Moving the band up
+	// to pair it with the fork one pulled this end back inside a box that had
+	// been big enough; a test that watched only the other end would have passed.
+	if x, y := centreX+reach, centreY+reach; x <= boxW && y <= boxW {
+		t.Errorf("the band's lower end stops inside the box at (%.0f, %.0f), box %.0f: "+
+			"it must be clipped by an edge. A box of at most %.0f px would clip it.",
+			x, y, boxW, y-1)
+	}
+
+	// ⛔⛔ AND THE BOX MUST HOLD THE WORDS, which is the constraint that was
+	// missing when the first attempt at pairing the bands shrank the box: the
+	// ends clipped, both assertions above passed, and the band read
+	// "gital Commons".
+	//
+	// The text is centred on the band, so it occupies the centre ±(half its
+	// width)·cos45 in BOTH axes. "Digital Commons" is about 110px at 13px bold.
+	const textReach = 110 / 2 * 0.7071
+	for _, c := range []struct {
+		x, y float64
+		what string
+	}{
+		{centreX - textReach, centreY - textReach, "first letters"},
+		{centreX + textReach, centreY + textReach, "last letters"},
+	} {
+		if c.x < 0 || c.y < 0 || c.x > boxW || c.y > boxW {
+			t.Errorf("the band's %s fall outside the %0.f px box at (%.0f, %.0f): "+
+				"the words are cut off. The box clips the BAND on purpose and the "+
+				"TEXT never.", c.what, boxW, c.x, c.y)
+		}
 	}
 }
 
