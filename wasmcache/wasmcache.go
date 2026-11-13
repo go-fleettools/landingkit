@@ -49,6 +49,11 @@ type Config struct {
 	// ("playground/*.wasm", path.Match syntax) or a directory with a
 	// trailing slash ("playground/fonts/", everything beneath it).
 	Assets []string
+	// Lazy name files the same way, kept like the others but stored when
+	// first asked for (verified against the manifest) rather than at
+	// install: an export engine, fonts for one language. Everything in
+	// Assets is downloaded in the background after the first visit.
+	Lazy []string
 	// Scopes are the paths a worker controls, each starting and ending with
 	// a slash ("/playground/", "/fr/playground/"). A worker can only
 	// control the directory it is served from, so there is one per scope.
@@ -71,6 +76,7 @@ type File struct {
 	Path   string `json:"path"`
 	SHA256 string `json:"sha256"`
 	Size   int64  `json:"size"`
+	Lazy   bool   `json:"lazy,omitempty"`
 }
 
 // Manifest is what Generate decided; the worker holds it.
@@ -94,7 +100,7 @@ func Generate(cfg Config) (*Manifest, error) {
 	if len(cfg.Scopes) == 0 {
 		return nil, errors.New("wasmcache: no scope")
 	}
-	if len(cfg.Assets) == 0 {
+	if len(cfg.Assets)+len(cfg.Lazy) == 0 {
 		return nil, errors.New("wasmcache: no asset")
 	}
 	if cfg.Home == "" {
@@ -155,7 +161,8 @@ func write(dir, url string, b []byte) error {
 // collect hashes every file of the site an asset pattern names.
 func collect(cfg Config) ([]File, error) {
 	var out []File
-	used := make([]bool, len(cfg.Assets))
+	pats := append(append([]string(nil), cfg.Assets...), cfg.Lazy...)
+	used := make([]bool, len(pats))
 	err := filepath.WalkDir(cfg.Dir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
@@ -168,10 +175,11 @@ func collect(cfg Config) ([]File, error) {
 		if base := path.Base(rel); base == "wasmcache-sw.js" || base == "wasmcache.json" || base == "wasmcache-client.js" {
 			return nil // ours, from an earlier run
 		}
-		hit := false
-		for i, pat := range cfg.Assets {
+		hit, lazy := false, false
+		for i, pat := range pats {
 			if matches(pat, rel) {
 				used[i], hit = true, true
+				lazy = lazy || i >= len(cfg.Assets)
 			}
 		}
 		if !hit {
@@ -186,7 +194,7 @@ func collect(cfg Config) ([]File, error) {
 		if err != nil {
 			return err
 		}
-		out = append(out, File{Path: "/" + rel, SHA256: sum(b), Size: int64(len(b))})
+		out = append(out, File{Path: "/" + rel, SHA256: sum(b), Size: int64(len(b)), Lazy: lazy})
 		return nil
 	})
 	if err != nil {
@@ -194,7 +202,7 @@ func collect(cfg Config) ([]File, error) {
 	}
 	for i, u := range used {
 		if !u {
-			return nil, fmt.Errorf("wasmcache: asset %q matches no file under %s", cfg.Assets[i], cfg.Dir)
+			return nil, fmt.Errorf("wasmcache: asset %q matches no file under %s", pats[i], cfg.Dir)
 		}
 	}
 	return out, nil

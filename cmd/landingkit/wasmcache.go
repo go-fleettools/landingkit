@@ -15,7 +15,7 @@ const wasmcacheUsage = `usage:
   landingkit wasmcache [flags]            write the service worker, page script and version file into a built site
   landingkit wasmcache testkit -out <dir>  write the browser tests (wasmcache-e2e.cjs) a playground runs in its CI
 
-flags: -dir <built site> -asset <glob|dir/> (repeat) -scope </path/> (repeat) [-exclude </prefix/> (repeat, default /api/)] [-version <deploy id>] [-home </path/>] [-name <cache name>]
+flags: -dir <built site> -asset <glob|dir/> (repeat) [-lazy <glob|dir/> (repeat)] -scope </path/> (repeat) [-exclude </prefix/> (repeat, default /api/)] [-version <deploy id>] [-home </path/>] [-name <cache name>]
 `
 
 type list []string
@@ -30,9 +30,10 @@ func cmdWasmcache(args []string, stdout, stderr io.Writer) int {
 	fl := flag.NewFlagSet("wasmcache", flag.ContinueOnError)
 	fl.SetOutput(stderr)
 	var cfg wasmcache.Config
-	var assets, scopes, exclude list
+	var assets, lazy, scopes, exclude list
 	fl.StringVar(&cfg.Dir, "dir", "", "the built site")
 	fl.Var(&assets, "asset", "a glob or a directory/ to cache (repeat)")
+	fl.Var(&lazy, "lazy", "a glob or a directory/ stored on first use rather than at install (repeat)")
 	fl.Var(&scopes, "scope", "a worker's scope, /playground/ (repeat)")
 	fl.Var(&exclude, "exclude", "a path prefix never cached (repeat; default /api/)")
 	fl.StringVar(&cfg.Version, "version", "", "the deploy's identity (default: the content hash)")
@@ -45,7 +46,7 @@ func cmdWasmcache(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stderr, wasmcacheUsage)
 		return 2
 	}
-	cfg.Assets, cfg.Scopes, cfg.Exclude = assets, scopes, exclude
+	cfg.Assets, cfg.Lazy, cfg.Scopes, cfg.Exclude = assets, lazy, scopes, exclude
 	m, err := wasmcache.Generate(cfg)
 	if err != nil {
 		fmt.Fprintln(stderr, err)

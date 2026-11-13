@@ -103,7 +103,9 @@ const out = {};
   const cached = await page.evaluate(() => wasmcache.cached());
   if (cached !== true) fail("the first visit did not cache the build (wasmcache.cached() = " + cached + ")");
   const keys = await page.evaluate(async (n) => { const c = await caches.open(n); return (await c.keys()).map((r) => new URL(r.url).pathname); }, cacheName());
-  for (const f of manifest.files) if (!keys.includes(f.path)) fail(f.path + " is not in the cache after the first visit");
+  const eager = manifest.files.filter((f) => !f.lazy), lazy = manifest.files.filter((f) => f.lazy);
+  for (const f of eager) if (!keys.includes(f.path)) fail(f.path + " is not in the cache after the first visit");
+  for (const f of lazy) if (keys.includes(f.path)) fail(f.path + " is lazy and was cached before anyone asked for it");
   const scopeSeen = await page.evaluate(async () => (await navigator.serviceWorker.getRegistration()).scope);
   if (scopeSeen !== base + scope) fail("the worker's scope is " + scopeSeen + ", not " + base + scope);
   out.firstVisit = keys.length + " files cached, scope " + scope;
@@ -112,11 +114,22 @@ const out = {};
   // 2. the second load asks the server for none of them
   hits = {};
   page = await open();
-  const asked = manifest.files.filter((f) => hits[f.path]);
+  const asked = eager.filter((f) => hits[f.path]);
   if (asked.length) fail("the second load asked the server for " + asked.map((f) => f.path).join(", "));
   const viaSW = await page.evaluate((a) => fetch(a).then((r) => r.status), assets[0]);
   if (viaSW !== 200 || hits[assets[0]]) fail("a cached asset reached the network");
-  out.secondLoad = "0 requests for the " + manifest.files.length + " cached files";
+  out.secondLoad = "0 requests for the " + eager.length + " cached files";
+  // a lazy file: fetched (and stored) on first use, from the cache after
+  for (const f of lazy) {
+    const body = await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()).then((b) => b.byteLength), f.path);
+    if (body !== f.size) fail(f.path + " came back with " + body + " bytes");
+    for (let i = 0; i < 100 && (await cacheHash(page, f.path)) !== f.sha256; i++) await sleep(100);
+    if ((await cacheHash(page, f.path)) !== f.sha256) fail(f.path + " was not stored on first use");
+    hits = {};
+    await page.evaluate((a) => fetch(a), f.path);
+    if (hits[f.path]) fail(f.path + " reached the network after first use");
+  }
+  if (lazy.length) out.lazyFiles = lazy.length + " lazy file(s) stored on first use, then served without the network";
   await page.close();
 
   // 3. a corrupt entry, then a truncated one: the network answers, the entry is repaired
