@@ -182,7 +182,16 @@
        mantra follows below, checked against the base branch in CI. */}}
   {{- with (.Site.Params.commons | default dict).url }}
   .commons-ribbon{position:absolute;top:0;right:0;width:230px;height:230px;overflow:hidden;z-index:29;pointer-events:none}
-  .commons-ribbon a{position:absolute;top:108px;right:-36px;width:260px;padding:7px 0;transform:rotate(45deg);
+  {{- /* ⛔ THE BAND IS 400px BECAUSE A ROTATED ONE IS MEASURED BEFORE IT TURNS.
+       It was 260px and BOTH ITS ENDS STOPPED IN MID-AIR inside the box: a
+       corner ribbon is only a ribbon because the box clips it, and one that
+       ends short reads as a floating label. `transform:rotate` turns the
+       element about its CENTRE, so a horizontal band of length L reaches
+       L/2·cos45 ≈ 0.354·L each way; with the centre 136px from the box's left
+       edge, 260px reached 92px and fell 44px short. 400px reaches 141px and
+       both ends leave the 230px box. The fork ribbon never showed this because
+       its 200px in a 150px box is proportionally far longer. */}}
+  .commons-ribbon a{position:absolute;top:108px;right:-36px;width:400px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
   .commons-ribbon a:hover{filter:brightness(1.08)}
@@ -191,7 +200,7 @@
        across: the fork ribbon's 112px becomes 172px, and a phone's 84px
        becomes 128px */}}
   @media(max-width:1420px){.nav .wrap{padding-right:172px}}
-  @media(max-width:600px){.commons-ribbon{width:172px;height:172px}.commons-ribbon a{top:78px;right:-52px;font-size:11px;padding:5px 0;width:200px}.nav .wrap{padding-right:128px}}
+  @media(max-width:600px){.commons-ribbon{width:172px;height:172px}.commons-ribbon a{top:78px;right:-52px;font-size:11px;padding:5px 0;width:300px}.nav .wrap{padding-right:128px}}
   {{- end }}
   {{- /* The top bar's title as a menu of the organisation's other sites
        (brand-menu.html). Emitted only for a site with [[params.siblings]]:
