@@ -35,7 +35,7 @@ func site(t *testing.T) string {
 
 func TestGenerate(t *testing.T) {
 	d := site(t)
-	cfg := Config{Dir: d, Assets: []string{"playground/*.wasm", "playground/index.html", "playground/fonts/", "fr/playground/index.html"},
+	cfg := Config{Dir: d, Assets: []string{"playground/*.wasm", "playground/index.html", "fr/playground/index.html"}, Lazy: []string{"playground/fonts/"},
 		Scopes: []string{"/playground/", "/fr/playground/"}}
 	m, err := Generate(cfg)
 	if err != nil {
@@ -48,6 +48,11 @@ func TestGenerate(t *testing.T) {
 	want := "/fr/playground/index.html /playground/app.wasm /playground/fonts/a.ttf /playground/index.html /playground/wasmcache-client.js"
 	if strings.Join(paths, " ") != want {
 		t.Fatalf("files %v", paths)
+	}
+	for _, f := range m.Files {
+		if f.Lazy != strings.Contains(f.Path, "/fonts/") {
+			t.Fatalf("%s: lazy = %v", f.Path, f.Lazy)
+		}
 	}
 	if m.Version != m.Build || len(m.Build) != 16 || m.Name != "wasmcache" || len(m.Exclude) != 1 || m.Exclude[0] != "/api/" {
 		t.Fatalf("manifest %+v", m)
@@ -195,7 +200,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	put(t, d, "playground/app.wasm", strings.Repeat("0123456789abcdef", 1<<16)) // 1 MiB
 	put(t, d, "playground/fonts/f.ttf", "font bytes")
 	put(t, d, "api/x", "{}")
-	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm", "playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
+	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm"}, Lazy: []string{"playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := filepath.Join(t.TempDir(), "wasmcache-e2e.cjs")

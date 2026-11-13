@@ -61,7 +61,8 @@ self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const todo = Array.from(FILES.keys());
+      // lazy files wait for their first request (see the fetch handler)
+      const todo = CONFIG.files.filter((f) => !f.lazy).map((f) => f.path);
       // two at a time: a wasm is tens of megabytes in memory while it is hashed
       await Promise.all([0, 1].map(async () => {
         for (let p; (p = todo.pop()) !== undefined;) {
@@ -148,6 +149,14 @@ self.addEventListener("fetch", (e) => {
       }
       await cache.delete(p); // broken: the network answers, and the entry is rewritten
       e.waitUntil(fetchVerified(p).then((r) => r && cache.put(p, r)));
+    }
+    if (FILES.get(p).lazy) {
+      // first use of a lazy file: verified, stored for the next visit, served
+      const res = await fetchVerified(p);
+      if (res) {
+        await cache.put(p, res.clone());
+        return res;
+      }
     }
     return fetch(e.request);
   })());

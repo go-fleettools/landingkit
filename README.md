@@ -902,8 +902,9 @@ Run it on the BUILT site, after the step that writes the pages:
 ```sh
 landingkit wasmcache -dir public -version "$GITHUB_SHA" \
   -scope /playground/ -scope /fr/playground/ \
-  -asset 'playground/*.wasm' -asset playground/wasm_exec.js -asset playground/fonts/ \
+  -asset 'playground/*.wasm' -asset playground/wasm_exec.js \
   -asset playground/index.html -asset fr/playground/index.html \
+  -lazy playground/fonts/ \
   -exclude /api/
 ```
 
@@ -921,6 +922,9 @@ What it does, and what it refuses:
 - **First visit**: the page downloads as it always did; then the worker
   stores each listed file under `<name>-<build>`, each checked against its
   hash (the HTTP cache answers first, so the wasm is not downloaded twice).
+- **`-lazy` files** (an export engine, fonts for one language) are not
+  downloaded in the background: the first request is verified, stored and
+  served, and the next visit has it.
 - **Later visits**: the listed files, the page included, come from the cache
   with no request. The hash is checked again on every read: a corrupt or
   truncated entry is deleted, the network answers, and the entry is rewritten.
