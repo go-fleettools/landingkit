@@ -2,8 +2,11 @@ package landingkit
 
 import (
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -132,6 +135,53 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	if strings.Count(s, "transform:rotate(45deg)") != 2 {
 		t.Errorf("the two bands do not both rotate 45deg: %d occurrence(s)",
 			strings.Count(s, "transform:rotate(45deg)"))
+	}
+	assertTheBandIsClipped(t, s)
+}
+
+// ⛔⛔ A CORNER RIBBON IS ONLY A RIBBON BECAUSE THE BOX CLIPS IT, and v0.23.0's
+// second band was too short to reach the edge: BOTH ITS ENDS STOPPED IN
+// MID-AIR, which reads as a floating label rather than a band. It was 260px.
+//
+// `transform:rotate` turns the element about its CENTRE, so a horizontal band
+// of length L reaches only L/2·cos45 ≈ 0.354·L each way — measured before it
+// turns, which is the trap. With the centre 136px from the box's left edge,
+// 260px reached 92px and fell 44px short.
+//
+// This checks the LEFT end, which is the one that must leave the box
+// horizontally. The right end leaves through the BOTTOM edge, which depends on
+// the band's rendered height and so is not computed here; the screenshot is
+// what confirms that one.
+//
+// ⚠ IT IS COMPUTED FROM THE SHEET'S OWN NUMBERS, not compared with 400. A test
+// that asserted the literal would pass for a box that had been resized under
+// it, which is exactly the drift this guards.
+func assertTheBandIsClipped(t *testing.T, sheet string) {
+	t.Helper()
+	num := func(re, what string) float64 {
+		m := regexp.MustCompile(re).FindStringSubmatch(sheet)
+		if m == nil {
+			t.Fatalf("the sheet does not state the band's %s (%s)", what, re)
+		}
+		v, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			t.Fatalf("%s: %v", what, err)
+		}
+		return v
+	}
+	boxW := num(`\.commons-ribbon\{position:absolute;top:0;right:0;width:(\d+)px`, "box width")
+	bandW := num(`\.commons-ribbon a\{position:absolute;top:\d+px;right:-\d+px;width:(\d+)px`, "band width")
+	rightOff := num(`\.commons-ribbon a\{position:absolute;top:\d+px;right:-(\d+)px`, "right offset")
+
+	// the band's centre, in box coordinates: its right edge sits rightOff past
+	// the box's right edge
+	centreX := boxW + rightOff - bandW/2
+	reach := bandW / 2 * math.Cos(math.Pi/4)
+	if leftEnd := centreX - reach; leftEnd >= 0 {
+		t.Errorf("the band's left end stops %0.f px INSIDE the box (box %0.f, band %0.f, "+
+			"right -%0.f): it must be clipped by the edge, not float. A band of %0.f px "+
+			"would reach it.",
+			leftEnd, boxW, bandW, rightOff, (boxW+rightOff)/(0.5+math.Cos(math.Pi/4)/2))
 	}
 }
 
