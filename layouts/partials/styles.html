@@ -168,6 +168,64 @@
   .fork-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
   @media(max-width:1420px){.nav .wrap{padding-right:112px}}
   @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:34px;right:-52px;font-size:11px;padding:5px 0}.nav .wrap{padding-right:84px}}
+  {{- /* The Digital Commons ribbon: a SECOND band in the same corner, outside
+       the fork one and at the same 45°, so the two are parallel rather than
+       crossed. It is further from the corner, so its chord is longer: the box
+       grows to 230px and the band is 60px further down the diagonal, 60px
+       wider, to span it. Everything else is the fork ribbon's, deliberately —
+       a pair that differed in weight or dash would read as two decorations
+       that happened to land together.
+
+       ⛔ EMITTED ONLY FOR A SITE THAT ASKED. Without [params.commons] url
+       nothing here reaches the sheet, so every other landing's stylesheet is
+       the byte-identical one it had before this existed — the same rule the
+       mantra follows below, checked against the base branch in CI. */}}
+  {{- with (.Site.Params.commons | default dict).url }}
+  .commons-ribbon{position:absolute;top:0;right:0;width:230px;height:230px;overflow:hidden;z-index:29;pointer-events:none}
+  .commons-ribbon a{position:absolute;top:108px;right:-36px;width:260px;padding:7px 0;transform:rotate(45deg);
+    background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
+    box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
+  .commons-ribbon a:hover{filter:brightness(1.08)}
+  .commons-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
+  {{- /* the bar keeps clear of the OUTER band now, which reaches further
+       across: the fork ribbon's 112px becomes 172px, and a phone's 84px
+       becomes 128px */}}
+  @media(max-width:1420px){.nav .wrap{padding-right:172px}}
+  @media(max-width:600px){.commons-ribbon{width:172px;height:172px}.commons-ribbon a{top:78px;right:-52px;font-size:11px;padding:5px 0;width:200px}.nav .wrap{padding-right:128px}}
+  {{- end }}
+  {{- /* The top bar's title as a menu of the organisation's other sites
+       (brand-menu.html). Emitted only for a site with [[params.siblings]]:
+       without it the partial is the plain anchor and the sheet is unchanged.
+
+       The panel is absolutely placed so opening it does not push the bar's
+       height around, and it is the bar's own surface rather than a new
+       palette — the kit has one set of colours and this is not the place to
+       invent a second. */}}
+  {{- with .Site.Params.siblings }}
+  .brand-menu{position:relative}
+  .brand-menu summary{cursor:pointer;list-style:none}
+  .brand-menu summary::-webkit-details-marker{display:none}
+  {{- /* ⛔ THE CARET IS A REAL ELEMENT, NOT A GENERATED PSEUDO-ELEMENT.
+       TestMantra forbids generated content in this sheet, and it is right to:
+       the strip was drawn that way once and a reader, a search engine and a
+       text check could not see it. A caret is decoration rather than text, so
+       it would have been a fair exception — but an exception is how a rule
+       stops holding, and brand-menu.html can just as well write a <span>.
+       (The test matches this file as plain text, comments included, so even
+       naming the forbidden form here would fail it. That is bluntness in the
+       safe direction.) The caret follows the ink colour and turns when the
+       menu opens. */}}
+  .brand-caret{width:0;height:0;margin-left:2px;border-left:4px solid transparent;
+    border-right:4px solid transparent;border-top:5px solid currentColor;opacity:.7;transition:transform .15s}
+  .brand-menu[open] .brand-caret{transform:rotate(180deg)}
+  .brand-menu summary:focus-visible{outline:2px solid var(--cyan);outline-offset:3px;border-radius:6px}
+  .brand-menu ul{position:absolute;top:calc(100% + 10px);left:-10px;z-index:40;margin:0;padding:6px;
+    list-style:none;min-width:190px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);
+    box-shadow:0 12px 28px -12px rgba(0,0,0,.45)}
+  .brand-menu li a{display:block;padding:8px 12px;border-radius:8px;font-weight:600;font-size:14px;color:var(--ink)}
+  .brand-menu li a:hover{background:var(--chip-bg)}
+  .brand-menu li a:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+  {{- end }}
   {{- /* The mantra: the fleet's two promises, as environment-variable chips in
        a strip under the top bar of every page. Since v0.7.0 they are TEXT,
        rendered by mantra.html from inside the nav bar (theme-toggle.html

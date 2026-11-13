@@ -5,6 +5,8 @@
 # falls back to these.
 kit_language: "Language"
 kit_forkMe: "Fork me on GitHub"
+kit_digitalCommons: "Digital Commons"
+kit_siblingSites: "Other sites of this organisation"
 kit_themeToggle: "Toggle light, dark or system theme"
 kit_themeSystem: "System"
 kit_themeLight: "Light"

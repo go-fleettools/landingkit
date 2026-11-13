@@ -8,7 +8,7 @@
 </head>
 <body class="lm">
 <header class="nav"><div class="wrap nav-in">
-  <a class="brand" href="/">{{ .Site.Title }}</a>
+  {{ partial "brand-menu.html" . }}
   {{ partial "theme-toggle.html" . }}
 </div></header>
 <main>

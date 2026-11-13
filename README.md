@@ -18,6 +18,8 @@ Renovate proposes the bump.
 | `layouts/partials/styles.html` | the whole design. Brand colours come from `[params.brand]`, defaulting to go-fileshare's cyan. It also emits `<meta name="darkreader-lock">` and the fork ribbon's CSS |
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
+| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0) |
+| `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites, from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
 | `layouts/partials/icons/book.html` | an open book (Octicons "book", MIT) for every "Read the documentation" button |
@@ -242,6 +244,70 @@ right after `</header>`. It is the "Fork me on GitHub" ribbon (github.blog,
 2008) drawn in CSS with the brand gradient instead of the original PNGs, so it
 follows the theme. It REPLACES the nav bar's GitHub button, and the hero has no
 "Browse the source" button: all three led to the same place.
+
+## The Digital Commons band (v0.23.0)
+
+A second band in the same corner, outside the fork one and at the same 45°, so
+the two read as a pair. "Fork me on GitHub" says the code can be taken; this
+says what it is taken into.
+
+```
+{{ partial "fork-ribbon.html" "https://github.com/<org>/<repo>" }}{{ partial "commons-ribbon.html" . }}
+```
+
+```toml
+[params.commons]
+  url = "https://en.wikipedia.org/wiki/Digital_commons"
+```
+
+⛔ **The two partials go on one line, with nothing between them.** The second
+one emits its own leading newline when it emits anything, and nothing at all
+when the site sets no `url` — so on a line of its own it would leave a blank
+line behind for every site that never asked for it.
+
+⚠ **The kit ships no default link.** A band that silently pointed somewhere
+nobody chose would put a destination on twelve organisations' landings that
+none of them wrote down. What the kit mutualises is the band and its geometry.
+
+Without `[params.commons]` `url` the stylesheet has no `.commons-ribbon` rule
+either: `landingkit verify` compares the `<style>` block as text, so a rule
+emitted unconditionally would fail every landing against the reference until it
+rebuilt. CI builds `example/` against the base branch and compares every page
+byte for byte.
+
+## The title's menu of sibling sites (v0.23.0)
+
+The top bar's title, with the organisation's other sites hanging from it.
+
+```
+{{ partial "brand-menu.html" . }}
+```
+
+in place of `<a class="brand" href="/">{{ .Site.Title }}</a>`.
+
+```toml
+[[params.siblings]]
+  name = "go-pdfkit"
+  url  = "https://go-pdfkit.github.io"
+
+[[params.siblings]]
+  name = "go-slides"
+  url  = "https://go-slides.github.io"
+```
+
+With no `[[params.siblings]]` it IS that anchor, character for character, so a
+landing can adopt the partial before it has anything to list.
+
+It is a `<details>`, not a script: the bar already works without JavaScript and
+this keeps it so. A disclosure opens on click and on Enter or Space, closes on
+Escape, and is announced as a button with its expanded state — the behaviour a
+hand-rolled menu has to re-implement and usually half-implements. The first
+item is the site's own home, which is what the title linked to before, so
+nothing the bar could do is lost.
+
+⚠ **The list is the landing's own.** Which sites are siblings is a fact about
+an organisation, not about the kit, and a default would put one organisation's
+neighbours on another's bar.
 
 ## The loading carousel
 

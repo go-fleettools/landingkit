@@ -2,6 +2,8 @@
 # własnym i18n/<lang>.yaml.
 kit_language: "Język"
 kit_forkMe: "Zrób fork na GitHubie"
+kit_digitalCommons: "Cyfrowe dobra wspólne"
+kit_siblingSites: "Pozostałe witryny tej organizacji"
 kit_themeToggle: "Przełącz motyw jasny, ciemny lub systemowy"
 kit_themeSystem: "Systemowy"
 kit_themeLight: "Jasny"
