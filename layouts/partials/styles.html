@@ -182,11 +182,13 @@
        a pair that differed in weight or dash would read as two decorations
        that happened to land together.
 
-       ⛔ EMITTED ONLY FOR A SITE THAT ASKED. Without [params.commons] url
-       nothing here reaches the sheet, so every other landing's stylesheet is
-       the byte-identical one it had before this existed — the same rule the
-       mantra follows below, checked against the base branch in CI. */}}
-  {{- with (.Site.Params.commons | default dict).url }}
+       ⛔ EMITTED WHENEVER THE BAND IS, AND THROUGH THE SAME PARTIAL. Since
+       v0.28.0 that is every landing except one that writes
+       [params.commons] url = "" — commons-url.html is the single answer, so a
+       sheet carrying this rule and a page carrying no band is unreachable.
+       A landing that opts out gets the stylesheet it had, byte for byte, which
+       is what `landingkit verify` compares as text. */}}
+  {{- with partial "commons-url.html" . }}
   {{- /* ⛔ THE BAND SAT 83px CLEAR OF THE FORK ONE, WHICH IS NOT A PAIR, IT IS
        TWO DECORATIONS. Both bands rotate about their OWN centre, so how far
        apart they look is not the difference of their `top` values — the boxes

@@ -122,7 +122,7 @@ jobs:
       - name: the partials are in the page
         run: |
           page="$RUNNER_TEMP/example/index.html"
-          for want in '<meta name="darkreader-lock">' 'class="fork-ribbon"' '--cyan:#0079A8' 'id="theme-toggle"' 'aria-label="Fork me on GitHub"'; do
+          for want in '<meta name="darkreader-lock">' 'class="fork-ribbon"' '--cyan:#0079A8' 'id="theme-toggle"' 'aria-label="Fork me on GitHub"' 'class="commons-ribbon"'; do
             grep -qF -- "$want" "$page" || { echo "::error::$want is not in the built page"; exit 1; }
           done
           echo "every partial reached the page"
@@ -226,10 +226,48 @@ jobs:
             fi
           done
           echo "the line reaches the page; an unknown and a repeated GOARCH are refused"
-      # The Digital Commons band and the title's menu of sibling sites: both
-      # opt-in, both silent unless the site asks. Configured, they reach the
-      # page AND the stylesheet; unset, the step after this one proves the
-      # built site is the base branch's byte for byte.
+      # ⛔⛔ THE BAND IS ON FOR EVERY LANDING, AND `url = ""` IS THE ONLY WAY OFF
+      # (v0.28.0). It shipped opt-in and that was a misreading: what belongs to
+      # one organisation is the MENU's list of sibling sites, not the band.
+      #
+      # ⚠ THREE CASES, BECAUSE TWO OF THEM CAN PASS FOR THE WRONG REASON. The
+      # opt-out turns on `isset` distinguishing "the landing wrote nothing" from
+      # "the landing wrote an empty string", and a `default` pipeline — the
+      # obvious way to write it — collapses those two and hands the refusing
+      # landing the band anyway. The Go contract test cannot see that; only the
+      # built page can, which is what this step reads. It also reads the
+      # STYLESHEET each time: the band and its CSS rule come from one partial,
+      # and the failure that matters is them disagreeing.
+      - name: the band is on by default, and url = "" is the only way off
+        run: |
+          band='<div class="commons-ribbon">'
+          rule='.commons-ribbon{position:absolute'
+          dflt='href="https://en.wikipedia.org/wiki/Digital_commons"'
+          has()    { grep -qF -- "$2" "$1" || { echo "::error::$3"; echo "wanted: $2"; exit 1; }; }
+          hasnot() { if grep -qF -- "$2" "$1"; then echo "::error::$3"; echo "unwanted: $2"; exit 1; fi; }
+          # a landing that writes nothing gets the band, pointing at the article
+          (cd example && hugo --destination "$RUNNER_TEMP/cm-unset")
+          p="$RUNNER_TEMP/cm-unset/index.html"
+          has "$p" "$band" "the band is not on a landing that configured nothing"
+          has "$p" "$rule" "the band's stylesheet rule is missing where the band is"
+          has "$p" "$dflt" "the default destination is not the Wikipedia article"
+          # url = "" turns the band AND its rule off
+          printf '[params.commons]\n  url = ""\n' > "$RUNNER_TEMP/cm-off.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/cm-off.toml" --destination "$RUNNER_TEMP/cm-off")
+          p="$RUNNER_TEMP/cm-off/index.html"
+          hasnot "$p" "$band" 'url = "" did not turn the band off'
+          hasnot "$p" "$rule" 'url = "" left the stylesheet rule behind'
+          # a landing's own url replaces the default
+          printf '[params.commons]\n  url = "https://example.invalid/commons"\n' > "$RUNNER_TEMP/cm-own.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/cm-own.toml" --destination "$RUNNER_TEMP/cm-own")
+          p="$RUNNER_TEMP/cm-own/index.html"
+          has    "$p" 'href="https://example.invalid/commons"' "a landing's own url did not replace the default"
+          hasnot "$p" "$dflt" "the default destination survived beside the landing's own"
+          echo "the band is on by default, off on an empty url, and takes the landing's own"
+      # The Digital Commons band's destination and the title's menu of sibling
+      # sites. Configured, they reach the page AND the stylesheet; with the band
+      # refused and no siblings, the step after this one proves the built site is
+      # the base branch's byte for byte.
       - name: the second band and the title menu reach a page that asks for them
         run: |
           cat > "$RUNNER_TEMP/commons.toml" <<'TOML'
@@ -358,15 +396,28 @@ jobs:
       # unconditionally would fail every one of them against the reference
       # until it rebuilt. Only meaningful while the base lacks the partials;
       # said, not hidden, after.
-      - name: neither configured, every page is the base's byte for byte
+      # ⛔ A LANDING THAT REFUSES THE BAND GETS THE PAGE IT HAD, BYTE FOR BYTE.
+      #
+      # ⚠ THIS STEP USED TO BUILD THE EXAMPLE WITH NO CONFIG AT ALL, which was
+      # the right comparison while the band was opt-in and is the WRONG one now:
+      # since v0.28.0 "no config" means "with the band", so a plain build and the
+      # base's differ ON PURPOSE. What still has to hold is the opt-out, so that
+      # is what is compared — url = "" against the base, which in a release that
+      # does not touch the band is the base built plainly.
+      - name: the band refused, every page is the base's byte for byte
         if: github.event_name == 'pull_request'
         run: |
-          if [ -f base/layouts/partials/commons-ribbon.html ]; then
-            echo "the base already has the band: nothing pre-band to compare with"; exit 0
+          if [ ! -f base/layouts/partials/commons-url.html ]; then
+            echo "the base predates the opt-out: its plain build is the comparison"
+            (cd base/example && hugo --destination "$RUNNER_TEMP/base-commons")
+          else
+            printf '[params.commons]\n  url = ""\n' > "$RUNNER_TEMP/base-off.toml"
+            (cd base/example && hugo --config "hugo.toml,$RUNNER_TEMP/base-off.toml" --destination "$RUNNER_TEMP/base-commons")
           fi
-          (cd base/example && hugo --destination "$RUNNER_TEMP/base-commons")
-          diff -r "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/example"
-          echo "every page of example/ is the base's, byte for byte"
+          printf '[params.commons]\n  url = ""\n' > "$RUNNER_TEMP/head-off.toml"
+          (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/head-off.toml" --destination "$RUNNER_TEMP/head-commons")
+          diff -r "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/head-commons"
+          echo "with the band refused, every page of example/ is the base's, byte for byte"
       - name: the mantra off, the page is the pre-mantra base's byte for byte
         if: github.event_name == 'pull_request'
         run: |

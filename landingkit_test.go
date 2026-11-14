@@ -57,19 +57,35 @@ func TestNoPartialEndsWithANewline(t *testing.T) {
 	}
 }
 
-// ⛔ THE TWO OPT-IN ADDITIONS MUST BE SILENT FOR EVERY SITE THAT DID NOT ASK.
-// Twelve organisations build this kit; a landing that sets neither
-// [params.commons] nor [[params.siblings]] has to render the page and the
-// stylesheet it rendered before they existed. CI proves it by building the
-// example against the base branch and comparing bytes; this says the same
-// thing one layer down, where it is cheap and runs on every change.
+// ⛔ THE MENU IS OPT-IN AND THE BAND IS OPT-OUT, AND THAT IS NOT AN ASYMMETRY
+// BY ACCIDENT. A landing that sets no [[params.siblings]] must render the page
+// and the stylesheet it rendered before the menu existed: which sites are its
+// siblings is nobody's business but its own, and a default list is unthinkable.
+// The Digital Commons band is the other way round — since v0.28.0 it is on for
+// every landing, because what it names is true of all of them, and a landing
+// says no with [params.commons] url = "".
+//
+// ⚠ The band shipped opt-in in v0.23.0 on a misreading, corrected by the user:
+// what belongs to one organisation is the MENU's list, not the band.
 func TestTheNewPartialsAreOptIn(t *testing.T) {
-	// The ribbon writes nothing without the param, and the menu falls back to
+	// The ribbon writes nothing when the url is empty, and the menu falls back to
 	// the exact anchor the layouts used to write by hand.
 	contract(t, "layouts/partials/commons-ribbon.html", []string{
+		`{{- $url := partial "commons-url.html" . }}`, // ONE answer, shared with the sheet
 		`{{- with $url }}`, // nothing at all when it is empty
 		`class="commons-ribbon"`,
 		`{{ i18n "kit_digitalCommons" | safeHTML }}`,
+	})
+	// ⛔⛔ `isset`, NOT a `default` PIPELINE, AND THAT IS THE WHOLE OPT-OUT.
+	// `default` treats "" as absent, so a landing writing url = "" to refuse the
+	// band would be handed it anyway. Mutating this line to
+	// `{{ $url = .url | default $url }}` leaves the Go suite green and fails the
+	// hugo lane's `off` case, which is why that case exists and reads the BUILT
+	// page rather than this file.
+	contract(t, "layouts/partials/commons-url.html", []string{
+		`{{- $url := "https://en.wikipedia.org/wiki/Digital_commons" -}}`,
+		`{{ if isset . "url" }}{{ $url = .url }}{{ end }}`,
+		`{{- return $url -}}`,
 	})
 	contract(t, "layouts/partials/brand-menu.html", []string{
 		`{{- if $sibs -}}`,
@@ -100,12 +116,14 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 		t.Error("the sheet no longer sizes .glyph at 32px: brand-menu.html still writes 32")
 	}
 
-	// ⛔ AND THE SHEET'S NEW RULES ARE GUARDED BY THE SAME PARAMS. A rule
-	// emitted unconditionally would move every organisation's stylesheet, and
-	// `landingkit verify` compares the <style> block as text: every landing
-	// would fail against the reference until it rebuilt.
+	// ⛔ AND THE SHEET'S RULES ARE GUARDED BY THE SAME ANSWER THE MARKUP USES.
+	// The menu's rule is guarded on the landing's own param; the band's is
+	// guarded on commons-url.html, the partial commons-ribbon.html emits from,
+	// so a sheet carrying .commons-ribbon beside a page carrying no band is
+	// unreachable. `landingkit verify` compares the <style> block as text, so a
+	// landing that opts out has to get its old sheet back exactly.
 	s := contract(t, "layouts/partials/styles.html", []string{
-		`{{- with (.Site.Params.commons | default dict).url }}`,
+		`{{- with partial "commons-url.html" . }}`,
 		`.commons-ribbon{position:absolute;top:0;right:0;`,
 		`{{- with .Site.Params.siblings }}`,
 		`.brand-menu{position:relative}`,
