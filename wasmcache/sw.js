@@ -137,12 +137,56 @@ function pathOf(req) {
   return p;
 }
 
+// clientSkew: true when the page or worker making this request is itself of
+// another deploy (its URL carries ?v=<other>). A file it asks for WITHOUT ?v
+// (a worker's importScripts("wasm_exec.js")) is that deploy's, not this
+// build's: an older /playground/ worker must not hand its copy to a newer
+// /fr/ page, nor the reverse.
+async function clientSkew(e) {
+  // a navigation has no client yet (and asking for the one it will create
+  // never answers): only requests made BY a page or worker are judged
+  const id = e.request.mode === "navigate" ? "" : e.clientId;
+  if (!id) {
+    return false;
+  }
+  const c = await self.clients.get(id);
+  if (!c) {
+    return false;
+  }
+  const v = new URL(c.url).searchParams.get("v");
+  return v !== null && v !== CONFIG.version;
+}
+
+// verifiedNetwork: the network's answer for a listed file, checked against the
+// manifest like a cache read. A file the server changed since this build was
+// written is refused, not run.
+async function verifiedNetwork(req, p) {
+  const res = await fetch(req);
+  if (!res.ok || res.status !== 200 || res.type !== "basic") {
+    return res; // an error, a redirect: not bytes to run; passed on as it is
+  }
+  const want = FILES.get(p);
+  const buf = await res.clone().arrayBuffer();
+  if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
+    if (new URL(req.url).searchParams.get("v") === null || new URL(req.url).searchParams.get("v") === CONFIG.version) {
+      await (await caches.open(CACHE)).put(p, stored(buf, res.headers)); // a missing entry heals
+    }
+    return res;
+  }
+  return new Response("wasmcache: " + p + " from the network is not the file this build was written with (hash mismatch); refused", {
+    status: 502, statusText: "wasmcache hash mismatch", headers: { "content-type": "text/plain" },
+  });
+}
+
 self.addEventListener("fetch", (e) => {
   const p = pathOf(e.request);
   if (p === "") {
     return;
   }
   e.respondWith((async () => {
+    if (new URL(e.request.url).searchParams.get("v") === null && (await clientSkew(e))) {
+      return fetch(e.request); // another deploy's request: not ours to answer
+    }
     const cache = await caches.open(CACHE);
     const hit = await cache.match(p);
     if (hit) {
@@ -162,6 +206,6 @@ self.addEventListener("fetch", (e) => {
         return res;
       }
     }
-    return fetch(e.request);
+    return verifiedNetwork(e.request, p);
   })());
 });

@@ -59,7 +59,7 @@ const assets = args.asset.length ? args.asset : [manifest.files[0].path];
 for (const a of assets) if (!manifest.files.some((f) => f.path === a)) fail(a + " is not in the manifest");
 
 // the server
-let hits = {}, bumped = 0, apiN = 0;
+let hits = {}, bumped = 0, apiN = 0, tamper = false;
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   hits[u.pathname] = (hits[u.pathname] || 0) + 1;
@@ -71,7 +71,9 @@ const server = http.createServer((req, res) => {
   let p = u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname;
   let body;
   try { body = fs.readFileSync(path.join(root, path.normalize(p))); } catch (e) { res.writeHead(404); return res.end("no"); }
-  if (bumped && p.endsWith("/wasmcache.json")) {
+  if (tamper && p === assets[0]) {
+    body = Buffer.alloc(body.length, 0x78); // same size, other bytes
+  } else if (bumped && p.endsWith("/wasmcache.json")) {
     body = Buffer.from(JSON.stringify({ name: manifest.name, build: "bumped" + bumped, version: "bumped" + bumped }));
   } else if (bumped && p === scope + "wasmcache-sw.js") {
     const m = Object.assign({}, manifest, { build: "bumped" + bumped, version: "bumped" + bumped });
@@ -185,6 +187,37 @@ const out = {};
     await page.close();
   }
   out.corruptEntries = "corrupt and truncated entries fall back to the network and are repaired";
+
+  // 3b. the network fallback is hash-checked too: with the entry gone and the
+  // server answering other bytes, the request is refused (502, a clear
+  // message), never handed to the page, and nothing is stored
+  page = await open();
+  await page.evaluate(async (n, p) => { await (await caches.open(n)).delete(p); }, cacheName(), a0);
+  tamper = true;
+  const bad = await page.evaluate((a) => fetch(a).then(async (r) => ({ status: r.status, text: (await r.text()).slice(0, 200) })), a0);
+  tamper = false;
+  if (bad.status !== 502 || !/hash mismatch/.test(bad.text)) fail("a tampered network answer was not refused: " + JSON.stringify(bad));
+  if ((await cacheHash(page, a0)) !== null) fail("a refused answer was stored");
+  const ok = await page.evaluate((a) => fetch(a).then((r) => r.status), a0);
+  if (ok !== 200) fail("the right bytes were refused after the tampered ones: " + ok);
+  out.networkFallback = "a network answer that does not match the manifest hash is refused with a 502 and not stored";
+  await page.close();
+
+  // 3c. version skew: a page of another deploy (?v=stale) asks for a file
+  // WITHOUT ?v (a worker's importScripts); it is not this build's to answer
+  page = await ctx.newPage();
+  await page.goto(base + pagePath + "?v=stale", { waitUntil: "load" });
+  await page.waitForFunction("navigator.serviceWorker.controller !== null", { timeout: 30000 });
+  hits = {};
+  await page.evaluate((a) => fetch(a), a0);
+  if (!hits[a0]) fail("a page of another deploy was answered from this build's cache");
+  await page.close();
+  page = await open();
+  hits = {};
+  await page.evaluate((a) => fetch(a), a0);
+  if (hits[a0]) fail("a page of this deploy lost its cache answer");
+  await page.close();
+  out.versionSkew = "a request without ?v from a page of another deploy goes to the network; this deploy's pages are still answered from the cache";
 
   // 4. /api/* is never cached
   hits = {};
