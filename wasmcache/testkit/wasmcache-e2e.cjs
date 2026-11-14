@@ -92,6 +92,7 @@ const out = {};
     const page = await ctx.newPage();
     if (hooks.viewport) await page.setViewport(hooks.viewport);
     page.on("pageerror", (e) => fail("page error: " + e));
+    page.on("console", (m) => { if (/^wasmcache:/.test(m.text())) console.error(new Date().toISOString() + " " + m.text()); });
     await page.goto(base + pagePath, { waitUntil: "load" });
     await page.waitForFunction(ready, { timeout: 90000 });
     await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 }); // the page called start()
