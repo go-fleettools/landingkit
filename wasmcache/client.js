@@ -150,7 +150,7 @@
           // the worker takes over, and the page follows it
           return new Promise(function (resolve) {
             navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
-            setTimeout(resolve, 3000);
+            setTimeout(resolve, 15000); // activation deletes the old cache first: slow on a busy machine
             w.postMessage("activate");
           });
         }
