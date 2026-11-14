@@ -105,7 +105,7 @@
     return new Promise(function (resolve) {
       if (!reg) { resolve(null); return; }
       var settled = false;
-      var done = function (w) { if (!settled) { settled = true; resolve(w); } };
+      var done = function (w) { if (!settled) { settled = true; console.info("wasmcache: install wait ended, worker " + (w ? w.state : "none")); resolve(w); } };
       var watch = function (w) {
         if (w.state === "installed") { done(w); return; }
         w.addEventListener("statechange", function () {
@@ -157,11 +157,13 @@
       return Promise.race([save.catch(function () {}), cap]).then(function () {
         return waitP || Promise.resolve(reg && reg.waiting);
       }).then(function (w) {
+        console.info("wasmcache: reload, new worker " + (w ? w.state : "none"));
         if (w) {
           // the worker takes over, and the page follows it
           return new Promise(function (resolve) {
-            navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
-            setTimeout(resolve, 15000); // activation deletes the old cache first: slow on a busy machine
+            navigator.serviceWorker.addEventListener("controllerchange", function () { console.info("wasmcache: controllerchange"); resolve(); }, { once: true });
+            setTimeout(function () { console.info("wasmcache: gave up waiting for controllerchange"); resolve(); }, 15000); // activation deletes the old cache first: slow on a busy machine
+            w.addEventListener("statechange", function () { console.info("wasmcache: new worker " + w.state); });
             w.postMessage("activate");
           });
         }
