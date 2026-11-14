@@ -224,7 +224,12 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	if err := os.WriteFile(kit, Testkit(), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(node, kit, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--neighbour", "/b/", "--ready", "window.appReady===true")
+	// the app's own feature, which needs the lazy font: the kit brackets it
+	hooks := filepath.Join(t.TempDir(), "hooks.cjs")
+	if err := os.WriteFile(hooks, []byte(`module.exports = { useFiles: ["/playground/fonts/f.ttf"], async use(page) { await page.evaluate(() => fetch("/playground/fonts/f.ttf").then((r) => r.arrayBuffer())); } };`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command(node, kit, "--hooks", hooks, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--neighbour", "/b/", "--ready", "window.appReady===true")
 	b, err := cmd.CombinedOutput()
 	t.Logf("%s", b)
 	if err != nil || !strings.Contains(string(b), "WASMCACHE_OK") {

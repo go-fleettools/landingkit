@@ -42,7 +42,10 @@ const prepare = args.prepare || "localStorage.setItem('wasmcache-kit','work')";
 const verify = args.verify || "localStorage.getItem('wasmcache-kit')==='work'";
 // --hooks <file.cjs>: an app's own way to make work and to find it again,
 // exporting { viewport, async prepare(page), async verify(page) -> bool };
-// without it --prepare and --verify are JS expressions.
+// without it --prepare and --verify are JS expressions. It may also export
+// useFiles (paths of lazy files) and async use(page): the app feature that
+// needs them, which the kit brackets with "not fetched or stored before,
+// cached after".
 const hooks = args.hooks ? require(path.resolve(args.hooks)) : {};
 const fail = (m) => { console.error("FAIL " + m); process.exit(1); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -152,6 +155,24 @@ const out = {};
   const viaSW = await page.evaluate((a) => fetch(a).then((r) => r.status), assets[0]);
   if (viaSW !== 200 || hits[assets[0]]) fail("a cached asset reached the network");
   out.secondLoad = "0 requests for the " + eager.length + " cached files";
+  // hooks.useFiles + hooks.use(page): a feature of the APP that needs lazy
+  // files. Before it is used they were neither asked for nor stored (a deck
+  // without video never fetches the video worker); after, they are cached.
+  if (hooks.use) {
+    const want = hooks.useFiles || [];
+    for (const f of want) {
+      if (!lazy.some((l) => l.path === f)) fail(f + " is not a lazy file of the manifest");
+      if (hits[f]) fail(f + " was fetched before its feature was used");
+      if ((await cacheHash(page, f)) !== null) fail(f + " was stored before its feature was used");
+    }
+    await hooks.use(page);
+    for (const f of want) {
+      const sha = lazy.find((l) => l.path === f).sha256;
+      for (let i = 0; i < 300 && (await cacheHash(page, f)) !== sha; i++) await sleep(100);
+      if ((await cacheHash(page, f)) !== sha) fail(f + " was not cached after its feature was used");
+    }
+    out.featureFiles = want.join(", ") + ": not fetched or stored until the feature is used, cached after";
+  }
   // a lazy file: fetched (and stored) on first use, from the cache after
   for (const f of lazy) {
     const body = await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()).then((b) => b.byteLength), f.path);
