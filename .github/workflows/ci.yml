@@ -446,8 +446,14 @@ jobs:
           fi
           printf '[params.commons]\n  url = ""\n' > "$RUNNER_TEMP/head-off.toml"
           (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/head-off.toml" --destination "$RUNNER_TEMP/head-commons")
-          diff -r "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/head-commons"
-          echo "with the band refused, every page of example/ is the base's, byte for byte"
+          # ⚠ forkonly/ is EXCLUDED, and only it: the promise is that a landing
+          # which refuses the band gets the pages it already had unchanged, not
+          # that this repository may never add an example page. It exists to be
+          # the fleet's layout shape in CI (see the step above), so the base
+          # branch has no such page and `diff -r` would report it for ever.
+          # Anything else appearing here is a real difference.
+          diff -r --exclude=forkonly "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/head-commons"
+          echo "with the band refused, every page example/ already had is the base's, byte for byte"
       - name: the mantra off, the page is the pre-mantra base's byte for byte
         if: github.event_name == 'pull_request'
         run: |

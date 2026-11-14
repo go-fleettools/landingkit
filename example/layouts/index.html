@@ -21,7 +21,20 @@
      landing that calls both gets TWO bands. This layout called both, which is
      why every test passed while ~320 landings — which call the fork ribbon
      alone — got the band's stylesheet and no band. The layout shaped like
-     theirs is layouts/forkonly.html, and CI builds it. */}}
+     theirs is layouts/forkonly.html, and CI builds it.
+
+     ⛔ AND IT ENDS WITH THE DASH FORM, WHICH IS NOT A DETAIL. A Hugo comment
+     emits nothing but its own trailing newline, so closing it without the dash
+     leaves a blank line in the page. The comment this one replaced said so in
+     its last sentence — and I deleted it and reintroduced the very byte it
+     warned about: CI caught `248a249 >` on the opt-out build, which is the
+     promise that a landing refusing the band gets the page it had BYTE FOR
+     BYTE.
+
+     ⚠ AND THE SENTENCE ABOVE MUST NOT SPELL THE CLOSING DELIMITER. Writing it
+     out, even inside backticks, CLOSES THIS COMMENT THERE: the first attempt
+     did, and five lines of prose about byte identity were emitted into the page
+     as text. A comment cannot quote its own terminator. */ -}}
 {{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}
 <main>
   <section class="hero"><div class="wrap">
