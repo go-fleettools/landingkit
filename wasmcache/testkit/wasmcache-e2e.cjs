@@ -231,10 +231,20 @@ const out = {};
   await page.waitForFunction(ready, { timeout: 90000 });
   await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
   if (!(hooks.verify ? await hooks.verify(page) : await page.evaluate(verify))) fail("the work was not kept over the update");
-  const info = await page.evaluate(() => new Promise((res) => {
-    navigator.serviceWorker.addEventListener("message", (e) => res(e.data.wasmcache));
-    navigator.serviceWorker.controller.postMessage("info");
-  }));
+  // asked until the new worker answers: a slow machine may still be handing
+  // the page over (the reload waits for it, but the kit does not assume)
+  let info = null;
+  for (let i = 0; i < 60; i++) {
+    info = await page.evaluate(() => new Promise((res) => {
+      const c = navigator.serviceWorker.controller;
+      if (!c) return res(null);
+      navigator.serviceWorker.addEventListener("message", (e) => res(e.data.wasmcache), { once: true });
+      c.postMessage("info");
+    }));
+    if (info && info.version === "bumped1") break;
+    await sleep(500);
+  }
+  if (!info) fail("no worker controls the page after accepting");
   if (info.version !== "bumped1") fail("the page runs " + info.version + " after accepting, not the new build");
   const names = await page.evaluate(() => caches.keys());
   const mine = names.filter((n) => n.startsWith(manifest.name + "|"));
