@@ -155,7 +155,20 @@
       try { if (o.beforeReload) { save = Promise.resolve(o.beforeReload()); } } catch (e) { /* reload anyway */ }
       var cap = new Promise(function (r) { setTimeout(r, 5000); });
       return Promise.race([save.catch(function () {}), cap]).then(function () {
-        return waitP || Promise.resolve(reg && reg.waiting);
+        return waitP || Promise.resolve(null);
+      }).then(function (w) {
+        // whatever the wait said, ask the registration as it is NOW: a CI
+        // runner answered "none" while the new worker was still installing
+        if (w || !reg) { return w; }
+        // polled: the worker may not be announced yet, or be installing
+        return new Promise(function (resolve) {
+          var end = Date.now() + 180000;
+          (function look() {
+            if (reg.waiting) { resolve(reg.waiting); return; }
+            if (Date.now() > end) { resolve(null); return; }
+            setTimeout(look, 300);
+          })();
+        });
       }).then(function (w) {
         console.info("wasmcache: reload, new worker " + (w ? w.state : "none"));
         if (w) {
