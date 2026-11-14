@@ -167,6 +167,46 @@ jobs:
             echo "::error::five items built"; exit 1
           fi
           echo "four chips reach the page; five are refused"
+      # ⛔ THE BUILD FLAG COMES FIRST, WHEREVER THE LANDING WROTE IT (v0.27.0).
+      # The chips are laid two to a row, so their ORDER IS THEIR GROUPING: a
+      # list that puts CGO_ENABLED between licences splits them across the two
+      # rows and a reader counting the licences has to hunt for the third. The
+      # kit hoists it rather than each landing fixing its own config.
+      #
+      # ⚠ THIS STEP READS THE RENDERED ORDER, not the template: TestMantra
+      # pins the literals, which would still match a hoist that reordered
+      # WRONGLY. Four cases, because each can pass for the wrong reason —
+      # hoisted from last, not moved when absent, not moved when the words
+      # appear mid-chip, and hoisted for CGO_ENABLED=1 (the invariant is about
+      # the flag, not its value).
+      - name: the build flag is the first chip, wherever the config wrote it
+        run: |
+          row() { printf '<span class="mantra-row"><code class="mantra-chip">%s</code><code class="mantra-chip">%s</code></span>' "$1" "$2"; }
+          build() {
+            printf '[params.mantra]\n  items = [%s]\n' "$2" > "$RUNNER_TEMP/cgo-$1.toml"
+            # ⚠ hugo's own output goes to STDERR here: this function's stdout
+            # is the path its caller captures, and the build stats would be
+            # captured with it.
+            (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/cgo-$1.toml" --destination "$RUNNER_TEMP/cgo-$1") >&2
+            echo "$RUNNER_TEMP/cgo-$1/index.html"
+          }
+          want() {
+            grep -qF -- "$2" "$1" || { echo "::error::$3"; echo "wanted: $2"; exit 1; }
+          }
+          # written LAST among four: hoisted to the head of the first row
+          p=$(build last '"LICENSE=BSD-3-Clause", "macros: LPPL-1.3c", "fonts: OFL-1.1", "CGO_ENABLED=0"')
+          want "$p" "$(row 'CGO_ENABLED=0' 'LICENSE=BSD-3-Clause')" "the flag written last is not the first chip"
+          want "$p" "$(row 'macros: LPPL-1.3c' 'fonts: OFL-1.1')" "the other chips lost the order the landing wrote"
+          # absent: nothing moves
+          p=$(build none '"LICENSE=BSD-3-Clause", "macros: LPPL-1.3c"')
+          want "$p" "$(row 'LICENSE=BSD-3-Clause' 'macros: LPPL-1.3c')" "a list without the flag was reordered"
+          # mentioned mid-chip: NOT the flag, so not hoisted
+          p=$(build words '"LICENSE=BSD-3-Clause", "needs CGO_ENABLED=0"')
+          want "$p" "$(row 'LICENSE=BSD-3-Clause' 'needs CGO_ENABLED=0')" "a chip merely naming the flag was hoisted"
+          # CGO_ENABLED=1: the invariant is the flag, not the value
+          p=$(build one '"LICENSE=BSD-3-Clause", "CGO_ENABLED=1"')
+          want "$p" "$(row 'CGO_ENABLED=1' 'LICENSE=BSD-3-Clause')" "CGO_ENABLED=1 was not hoisted"
+          echo "the build flag leads the strip in every case"
       # [params.mantra] goarch (v0.22.0): the line of architectures reaches the
       # page with its label and grows the bar by a row; an unknown GOARCH and a
       # repeated one are refused at build time. (Unset, the example above is
@@ -206,7 +246,10 @@ jobs:
           (cd example && hugo --config "hugo.toml,$RUNNER_TEMP/commons.toml" --destination "$RUNNER_TEMP/commons")
           page="$RUNNER_TEMP/commons/index.html"
           for want in \
-            '<div class="commons-ribbon"><a href="https://en.wikipedia.org/wiki/Digital_commons" aria-label="Digital Commons">Digital Commons</a></div>' \
+            '<div class="commons-ribbon"><a href="https://en.wikipedia.org/wiki/Digital_commons" aria-label="Digital Commons"><svg class="icon"' \
+            '</svg>Digital Commons</a></div>' \
+            '.commons-ribbon .icon{vertical-align:-3px' \
+            'd="M8.75.75V2h.985' \
             '<details class="brand-menu">' \
             '<li><a href="https://go-slides.github.io">go-slides<svg class="icon"' \
             '.commons-ribbon{position:absolute;top:0;right:0;' \

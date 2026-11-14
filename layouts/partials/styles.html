@@ -278,6 +278,14 @@
   .commons-ribbon a{position:absolute;top:76px;right:-52px;width:290px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
+  {{- /* The scales sit ON the words' line, not above them: an inline <svg> is
+       aligned on the text BASELINE by default, so its 16px box hangs with its
+       bottom edge on the baseline and the glyph floats high. -3px drops it by
+       the descender's worth, which is where a 16px icon beside 13px text reads
+       as part of the line. The band is 290px and the group is about 137px, so
+       the extra width changes no clipping number above: `text-align:center`
+       centres icon and words together. */}}
+  .commons-ribbon .icon{vertical-align:-3px;margin-right:6px}
   .commons-ribbon a:hover{filter:brightness(1.08)}
   .commons-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
   {{- /* the bar keeps clear of the OUTER band, which reaches further across

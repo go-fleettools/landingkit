@@ -16,6 +16,14 @@
          [params.commons]
            url = "https://en.wikipedia.org/wiki/Digital_commons"
 
+     ⚠ THE SCALES ARE OCTICONS' `law`, NOT A DIGITAL COMMONS LOGO. There is
+     none to use: "Digital Commons" is a TRADEMARK of Elsevier/RELX — the
+     bepress institutional-repository platform — and the commons this band
+     points at is the Wikipedia subject of the same name, which has no emblem.
+     Putting a mark that is somebody's product on twelve organisations' landings
+     would be the one mistake this band must not make, so it carries a generic
+     icon from a licensed set instead (icons/law.html, with its provenance).
+
      ⚠ THE URL IS THE SITE'S, NOT THE KIT'S. The kit ships no default link:
      a ribbon that silently pointed somewhere nobody chose would put a
      destination on twelve organisations' landings that none of them wrote
@@ -23,5 +31,5 @@
 {{- $url := "" }}
 {{- with .Site.Params.commons }}{{ $url = .url | default "" }}{{ end }}
 {{- with $url }}
-<div class="commons-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_digitalCommons" | safeHTML }}">{{ i18n "kit_digitalCommons" | safeHTML }}</a></div>
+<div class="commons-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_digitalCommons" | safeHTML }}">{{ partial "icons/law.html" . }}{{ i18n "kit_digitalCommons" | safeHTML }}</a></div>
 {{- end -}}
