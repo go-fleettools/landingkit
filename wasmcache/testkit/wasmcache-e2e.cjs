@@ -224,6 +224,12 @@ const out = {};
   });
   if (box.role !== "status" || box.pos !== "fixed" || box.share > 0.15 || box.midCovered) fail("the prompt is blocking: " + JSON.stringify(box));
   if (box.marker !== "still here") fail("the page reloaded by itself");
+  const regState = () => page.evaluate(async () => {
+    const r = await navigator.serviceWorker.getRegistration();
+    const s = (w) => (w ? w.state : null);
+    return r ? { active: s(r.active), waiting: s(r.waiting), installing: s(r.installing), scope: r.scope } : null;
+  });
+  console.error("before accepting: " + JSON.stringify(await regState()));
   out.prompt = "non-blocking prompt shown for a newer deploy: " + JSON.stringify(box.text.slice(0, 60)) + "; page not reloaded";
 
   // 6. accept: reload into the new build, work kept, old cache gone
@@ -245,7 +251,7 @@ const out = {};
     await sleep(500);
   }
   if (!info) fail("no worker controls the page after accepting");
-  if (info.version !== "bumped1") fail("the page runs " + info.version + " after accepting, not the new build");
+  if (info.version !== "bumped1") fail("the page runs " + info.version + " after accepting, not the new build; registration " + JSON.stringify(await regState()) + ", caches " + JSON.stringify(await page.evaluate(() => caches.keys())));
   const names = await page.evaluate(() => caches.keys());
   const mine = names.filter((n) => n.startsWith(manifest.name + "|"));
   if (mine.length !== 1 || mine[0] !== manifest.name + "|bumped1") fail("old caches remain: " + names.join(", "));
