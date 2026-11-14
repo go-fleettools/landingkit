@@ -173,6 +173,21 @@ async function verifiedNetwork(req, p) {
     }
     return res;
   }
+  if (req.mode === "navigate") {
+    // The page itself no longer matches this build: a newer deploy is out and
+    // the cached copy is gone or broken. A 502 here would leave the playground
+    // dead until someone accepted an update. Instead the page answered is a
+    // constant of this worker (it executes none of the server's bytes): it
+    // removes this worker and this playground's caches, and reloads, so the
+    // network's page, and its new worker, take over.
+    const name = JSON.stringify(CONFIG.name + "|");
+    return new Response(
+      "<!doctype html><meta charset=utf-8><title>Updating</title><p>Updating…</p><script>" +
+      "(async()=>{try{const r=await navigator.serviceWorker.getRegistration(location.href);if(r)await r.unregister();" +
+      "for(const k of await caches.keys())if(k.startsWith(" + name + "))await caches.delete(k)}catch(e){}location.reload()})()" +
+      "</script>",
+      { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+  }
   return new Response("wasmcache: " + p + " from the network is not the file this build was written with (hash mismatch); refused", {
     status: 502, statusText: "wasmcache hash mismatch", headers: { "content-type": "text/plain" },
   });

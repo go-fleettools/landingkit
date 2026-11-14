@@ -62,10 +62,13 @@ const assets = args.asset.length ? args.asset : [manifest.files[0].path];
 for (const a of assets) if (!manifest.files.some((f) => f.path === a)) fail(a + " is not in the manifest");
 
 // the server
-let hits = {}, bumped = 0, apiN = 0, tamper = false;
+// hits is reset between steps; everHits never is: what the server was asked
+// for since it started (the "not fetched before the feature is used" proof)
+let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "";
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   hits[u.pathname] = (hits[u.pathname] || 0) + 1;
+  everHits[u.pathname] = (everHits[u.pathname] || 0) + 1;
   if (u.pathname.startsWith(apiPrefix)) {
     apiN++;
     res.writeHead(200, { "content-type": "application/json", "cache-control": "private, no-store" }); // the browser's own cache must not answer: only a worker could
@@ -74,7 +77,8 @@ const server = http.createServer((req, res) => {
   let p = u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname;
   let body;
   try { body = fs.readFileSync(path.join(root, path.normalize(p))); } catch (e) { res.writeHead(404); return res.end("no"); }
-  if (tamper && p === assets[0]) {
+  if ((tamper && p === assets[0]) || (tamperOnce && p === tamperOnce)) {
+    if (p === tamperOnce) tamperOnce = ""; // a newer deploy answers the retry
     body = Buffer.alloc(body.length, 0x78); // same size, other bytes
   } else if (bumped && p.endsWith("/wasmcache.json")) {
     body = Buffer.from(JSON.stringify({ name: manifest.name, build: "bumped" + bumped, version: "bumped" + bumped }));
@@ -162,7 +166,7 @@ const out = {};
     const want = hooks.useFiles || [];
     for (const f of want) {
       if (!lazy.some((l) => l.path === f)) fail(f + " is not a lazy file of the manifest");
-      if (hits[f]) fail(f + " was fetched before its feature was used");
+      if (everHits[f]) fail(f + " was requested " + everHits[f] + " time(s) since the server started, before its feature was used");
       if ((await cacheHash(page, f)) !== null) fail(f + " was stored before its feature was used");
     }
     await hooks.use(page);
@@ -223,6 +227,33 @@ const out = {};
   if (ok !== 200) fail("the right bytes were refused after the tampered ones: " + ok);
   out.networkFallback = "a network answer that does not match the manifest hash is refused with a 502 and not stored";
   await page.close();
+
+  // 3b'. the page itself, when it no longer matches: a newer deploy is out and
+  // the cached copy is gone. Not a dead 502: the navigation takes the update
+  // path (this worker and its caches removed, a reload), and the network's page
+  // comes up, with a worker again. Only a constant of the worker ran meanwhile.
+  const indexPath = pagePath.endsWith("/") ? pagePath + "index.html" : pagePath;
+  if (manifest.files.some((f) => f.path === indexPath)) {
+    page = await open();
+    await page.evaluate(async (n, p) => { await (await caches.open(n)).delete(p); }, cacheName(), indexPath);
+    await page.close();
+    tamperOnce = indexPath;
+    page = await ctx.newPage();
+    if (hooks.viewport) await page.setViewport(hooks.viewport);
+    const resp = await page.goto(base + pagePath, { waitUntil: "load" });
+    if (resp.status() === 502) fail("a page that no longer matches answered a dead 502");
+    let up = false;
+    for (let i = 0; i < 900 && !up; i++) {
+      up = await page.evaluate(ready).catch(() => false);
+      if (!up) await sleep(100);
+    }
+    if (!up) fail("the app did not come up after the page changed under the cache (" + (await page.evaluate(() => document.body && document.body.innerText.slice(0, 80)).catch(() => "?")) + ")");
+    await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+    if ((await page.evaluate(() => wasmcache.cached())) !== true) fail("no cache again after the update path");
+    if (tamperOnce !== "") fail("the tampered page was not requested");
+    await page.close();
+    out.changedPage = indexPath + " not matching its hash took the update path (worker and caches removed, reload) and came back up, not a 502";
+  }
 
   // 3c. version skew: a page of another deploy (?v=stale) asks for a file
   // WITHOUT ?v (a worker's importScripts); it is not this build's to answer
