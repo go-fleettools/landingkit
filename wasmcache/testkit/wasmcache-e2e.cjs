@@ -140,7 +140,12 @@ const out = {};
   // 2. the second load asks the server for none of them
   hits = {};
   page = await open();
-  const asked = eager.filter((f) => hits[f.path]);
+  // --network <paths>: files this page's own worker is not the one that
+  // fetches (a Web Worker script is controlled by the worker whose scope holds
+  // the SCRIPT's URL: /fr/playground/ loads /playground/worker.js, which the
+  // /playground/ worker controls, not this one)
+  const viaOther = (args.network || "").split(",").filter(Boolean);
+  const asked = eager.filter((f) => hits[f.path] && !viaOther.includes(f.path));
   if (asked.length) fail("the second load asked the server for " + asked.map((f) => f.path).join(", "));
   const viaSW = await page.evaluate((a) => fetch(a).then((r) => r.status), assets[0]);
   if (viaSW !== 200 || hits[assets[0]]) fail("a cached asset reached the network");
