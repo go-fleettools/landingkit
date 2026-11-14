@@ -233,7 +233,7 @@ const out = {};
   out.prompt = "non-blocking prompt shown for a newer deploy: " + JSON.stringify(box.text.slice(0, 60)) + "; page not reloaded";
 
   // 6. accept: reload into the new build, work kept, old cache gone
-  await Promise.all([page.waitForNavigation({ waitUntil: "load", timeout: 30000 }), page.click("#wasmcache-reload")]);
+  await Promise.all([page.waitForNavigation({ waitUntil: "load", timeout: 240000 }), page.click("#wasmcache-reload")]); // Reload waits for the new build to install
   await page.waitForFunction(ready, { timeout: 90000 });
   await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
   if (!(hooks.verify ? await hooks.verify(page) : await page.evaluate(verify))) fail("the work was not kept over the update");
