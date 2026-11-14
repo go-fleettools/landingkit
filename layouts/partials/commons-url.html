@@ -1,0 +1,30 @@
+{{- /*
+commons-url.html: the one answer to "where does the Digital Commons band point,
+and is it on at all?". commons-ribbon.html emits the band from it and
+styles.html guards the band's CSS block on it, so the markup and the stylesheet
+can never disagree — the same arrangement mantra-on.html has for the strip.
+
+⛔ THE BAND IS ON BY DEFAULT, FOR EVERY LANDING. It was opt-in in v0.23.0 and
+that was a misreading on my part, corrected by the user in their own words: what
+belongs to one organisation is the MENU's list of sibling sites; the Digital
+Commons band is for everyone. The fleet's code is a commons, and a band that
+only appears where someone remembered to configure it says so on one landing and
+stays silent on eleven.
+
+    [params.commons]
+      url = "https://example.org/what-this-is-part-of"   # point it elsewhere
+      url = ""                                           # and this turns it OFF
+
+⚠ "UNSET" AND "EMPTY" ARE DIFFERENT, which is the whole opt-out. `isset` asks
+whether the landing WROTE the key: unset takes the default, and an empty string
+is a landing saying no. A `default` pipeline cannot express that — it treats ""
+as absent and would hand the refusing landing the band anyway.
+
+⚠ A LANDING THAT OPTS OUT GETS THE PAGE IT HAD, byte for byte: with no url this
+partial returns nothing, commons-ribbon.html emits nothing, and styles.html
+emits no .commons-ribbon rule. `landingkit verify` compares the <style> block as
+TEXT, so that has to stay exactly true.
+*/ -}}
+{{- $url := "https://en.wikipedia.org/wiki/Digital_commons" -}}
+{{- with .Site.Params.commons }}{{ if isset . "url" }}{{ $url = .url }}{{ end }}{{ end -}}
+{{- return $url -}}

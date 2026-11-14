@@ -3,18 +3,22 @@
      read as a pair rather than as two unrelated decorations. "Fork me on
      GitHub" says the code can be taken; this says what it is taken into.
 
-     ⛔ IT IS OPT-IN, AND SILENT WHEN UNSET. A landing that sets no
-     [params.commons] url gets nothing here and NO extra rule in the
-     stylesheet (styles.html guards the block on the same param), so every
-     site that has not asked for it builds byte for byte what it built before
-     this partial existed. That is the kit's standing rule for anything new,
-     and CI checks it against the base branch.
+     ⛔ IT IS ON BY DEFAULT SINCE v0.28.0, AND OPT-OUT. It shipped opt-in, on a
+     misreading this file used to argue for at length; the user's correction, in
+     their own words, is that what belongs to one organisation is the MENU's list
+     of sibling sites, and that the band is for everyone. commons-url.html holds
+     the one answer and styles.html guards the CSS block on the same partial, so
+     the markup and the stylesheet cannot disagree.
 
-     Called with the page: {{ partial "commons-ribbon.html" . }}, and
-     configured by the site:
+     Called with the page: {{ partial "commons-ribbon.html" . }}, and, if the
+     site wants something other than the default:
 
          [params.commons]
-           url = "https://en.wikipedia.org/wiki/Digital_commons"
+           url = "https://example.org/what-this-is-part-of"
+           url = ""      # and this turns the band off
+
+     A landing that opts out gets the page it had, byte for byte: no band and no
+     .commons-ribbon rule.
 
      ⚠ THE SCALES ARE OCTICONS' `law`, NOT A DIGITAL COMMONS LOGO. There is
      none to use: "Digital Commons" is a TRADEMARK of Elsevier/RELX — the
@@ -24,12 +28,11 @@
      would be the one mistake this band must not make, so it carries a generic
      icon from a licensed set instead (icons/law.html, with its provenance).
 
-     ⚠ THE URL IS THE SITE'S, NOT THE KIT'S. The kit ships no default link:
-     a ribbon that silently pointed somewhere nobody chose would put a
-     destination on twelve organisations' landings that none of them wrote
-     down. What the kit mutualises is the band and its geometry. */}}
-{{- $url := "" }}
-{{- with .Site.Params.commons }}{{ $url = .url | default "" }}{{ end }}
+     ⚠ THE DEFAULT IS THE WIKIPEDIA ARTICLE, not a page of ours. The band names
+     what the code is part of; a destination we own would make it an
+     advertisement for ourselves instead. A landing that is part of something
+     else says so with its own url. */}}
+{{- $url := partial "commons-url.html" . }}
 {{- with $url }}
 <div class="commons-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_digitalCommons" | safeHTML }}">{{ partial "icons/law.html" . }}{{ i18n "kit_digitalCommons" | safeHTML }}</a></div>
 {{- end -}}

@@ -18,7 +18,7 @@ Renovate proposes the bump.
 | `layouts/partials/styles.html` | the whole design. Brand colours come from `[params.brand]`, defaulting to go-fileshare's cyan. It also emits `<meta name="darkreader-lock">` and the fork ribbon's CSS |
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
-| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0). It carries the Octicons `law` scales since v0.27.0 — there is no Digital Commons logo to use, the name being Elsevier/RELX's trademark |
+| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. on for every landing since v0.28.0, pointing at the Wikipedia article; `[params.commons]` `url` points it elsewhere and `url = ""` turns it off, after which neither the band nor its CSS exists and the site is unchanged. It carries the Octicons `law` scales since v0.27.0 — there is no Digital Commons logo to use, the name being Elsevier/RELX's trademark |
 | `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites (v0.23.0; logos v0.24.0), from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
@@ -26,6 +26,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/graph.html` | a rising line graph (Octicons "graph", MIT) for a "Benchmarks" button (v0.17.0) |
 | `layouts/partials/icons/rocket.html` | a rocket (Octicons "rocket", MIT) for a "Quickstart" or "Get started" button (v0.17.0) |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground); `landingkit.LoadingCarousel` renders the same file for a page Hugo does not build (v0.12.0) |
+| `layouts/partials/commons-url.html` | where the band points, and whether it is there at all: the default, and `url = ""` as the opt-out. Read by both the band and the stylesheet so they cannot disagree (v0.28.0) |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
@@ -255,10 +256,31 @@ says what it is taken into.
 {{ partial "fork-ribbon.html" "https://github.com/<org>/<repo>" }}{{ partial "commons-ribbon.html" . }}
 ```
 
+⭐ **On for every landing since v0.28.0, and a landing says no with an empty
+url.** It shipped opt-in in v0.23.0, on a misreading: what belongs to one
+organisation is the **menu's** list of sibling sites, not the band. What the
+band names is true of every landing the kit builds, so it is the kit's to put
+there.
+
 ```toml
 [params.commons]
-  url = "https://en.wikipedia.org/wiki/Digital_commons"
+  url = "https://example.org/what-this-is-part-of"   # point it elsewhere
+  url = ""                                           # and this turns it OFF
 ```
+
+Unset, it points at
+[the Wikipedia article](https://en.wikipedia.org/wiki/Digital_commons) — not at
+a page of ours, which would make the band an advertisement for ourselves
+instead of a statement about what the code is part of.
+
+⛔ **`isset`, not a `default` pipeline**, and that is the whole opt-out:
+`default` treats `""` as absent and would hand the refusing landing the band
+anyway. Writing it that way leaves the Go suite green, so the hugo lane builds
+the example three ways — nothing written, `url = ""`, and a url of the site's
+own — and reads the **built page and its stylesheet** each time.
+
+**A landing that refuses it gets the page and the stylesheet it had, byte for
+byte**; CI compares that build against the base branch.
 
 ⭐ **The band carries a pair of scales (v0.27.0)**, the Octicons `law`, before
 the words. It is decorative (`aria-hidden`): the link already carries
@@ -278,15 +300,12 @@ one emits its own leading newline when it emits anything, and nothing at all
 when the site sets no `url` — so on a line of its own it would leave a blank
 line behind for every site that never asked for it.
 
-⚠ **The kit ships no default link.** A band that silently pointed somewhere
-nobody chose would put a destination on twelve organisations' landings that
-none of them wrote down. What the kit mutualises is the band and its geometry.
-
-Without `[params.commons]` `url` the stylesheet has no `.commons-ribbon` rule
-either: `landingkit verify` compares the `<style>` block as text, so a rule
-emitted unconditionally would fail every landing against the reference until it
-rebuilt. CI builds `example/` against the base branch and compares every page
-byte for byte.
+⚠ **One partial answers for both the band and its CSS.** `commons-url.html` is
+where the default and the opt-out live; `commons-ribbon.html` emits the band
+from it and `styles.html` guards the `.commons-ribbon` block on it, so a
+stylesheet carrying the rule beside a page carrying no band is unreachable.
+`landingkit verify` compares the `<style>` block as text, which is why that has
+to be exactly true.
 
 ## The title's menu of sibling sites (v0.23.0)
 
