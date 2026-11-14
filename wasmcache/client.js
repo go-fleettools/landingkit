@@ -44,7 +44,7 @@
     ko: { update: "새 버전이 있습니다.", reload: "새로 고침", later: "나중에" }
   };
   var here = document.currentScript && document.currentScript.src ? new URL(".", document.currentScript.src).pathname : "/";
-  var o = {}, st = "off", reg = null, running = "", shown = "", node = null, cname = "";
+  var o = {}, st = "off", reg = null, running = "", shown = "", node = null, cname = "", waitP = null;
   var cachedP = Promise.resolve(false);
 
   function words() {
@@ -120,7 +120,7 @@
       reg.update().then(function () {
         if (reg.waiting) { done(reg.waiting); }
         else if (reg.installing) { watch(reg.installing); }
-        else { setTimeout(function () { done(reg.waiting || null); }, 10000); } // no new worker announced
+        // else: not announced yet; updatefound or the cap below answers
       }, function () { done(null); });
       setTimeout(function () { done(reg.waiting || null); }, 180000); // an install that never ends
     });
@@ -142,8 +142,12 @@
         if (j.version === running || j.version === shown) { return j.version !== running; }
         shown = j.version;
         st = "update";
-        // install the new build first, so that Reload has something to switch to
-        return waitingWorker().then(function () { prompt(); return true; });
+        // the new build installs in the background (a wasm to download and
+        // hash: half a minute on a busy runner); the prompt is up at once and
+        // Reload waits for the install, so it has something to switch to
+        waitP = waitingWorker();
+        prompt();
+        return true;
       }).catch(function () { return false; }); // offline, or no version file: nothing to say
     },
     reload: function () {
@@ -151,7 +155,8 @@
       try { if (o.beforeReload) { save = Promise.resolve(o.beforeReload()); } } catch (e) { /* reload anyway */ }
       var cap = new Promise(function (r) { setTimeout(r, 5000); });
       return Promise.race([save.catch(function () {}), cap]).then(function () {
-        var w = reg && reg.waiting;
+        return waitP || Promise.resolve(reg && reg.waiting);
+      }).then(function (w) {
         if (w) {
           // the worker takes over, and the page follows it
           return new Promise(function (resolve) {
