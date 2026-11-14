@@ -238,6 +238,36 @@ jobs:
       # built page can, which is what this step reads. It also reads the
       # STYLESHEET each time: the band and its CSS rule come from one partial,
       # and the failure that matters is them disagreeing.
+      # ⛔⛔ THE LAYOUT THE FLEET ACTUALLY WRITES, which this lane had no subject
+      # for and which is why v0.28.0 shipped broken.
+      #
+      # That release turned the Digital Commons band on "by default" and it
+      # reached only the layouts calling commons-ribbon.html: example/'s, and
+      # almost nobody else's. ~320 landings wrote their own layouts/index.html
+      # before the band existed and call fork-ribbon.html alone, so the pin bump
+      # gave them the band's stylesheet rule and NO BAND —
+      # go-numerics.github.io served `commons-ribbon` once (the CSS) and
+      # "Digital Commons" not at all. Every case in this lane built the one
+      # layout that already did the right thing, so none of them could see it.
+      #
+      # forkonly/ calls fork-ribbon.html and nothing else from the ribbon family.
+      # If the band reaches that page, it reaches theirs.
+      - name: a layout that calls the fork ribbon alone still gets the band
+        run: |
+          page="$RUNNER_TEMP/example/forkonly/index.html"
+          test -f "$page" || { echo "::error::the fleet-shaped layout built no page"; exit 1; }
+          grep -qF -- '<div class="commons-ribbon">' "$page" \
+            || { echo "::error::the band does not reach a layout that calls only fork-ribbon.html"; exit 1; }
+          grep -qF -- 'href="https://en.wikipedia.org/wiki/Digital_commons"' "$page" \
+            || { echo "::error::the band on the fleet-shaped layout has no destination"; exit 1; }
+          # ⛔ EXACTLY ONE, on both layouts. fork-ribbon.html emits the band, so a
+          # layout that also calls commons-ribbon.html doubles it — which is what
+          # example/layouts/index.html used to do and no longer does.
+          for p in "$RUNNER_TEMP/example/forkonly/index.html" "$RUNNER_TEMP/example/index.html"; do
+            n=$(grep -c -F -- '<div class="commons-ribbon">' "$p")
+            test "$n" = 1 || { echo "::error::$p carries $n bands, want 1"; exit 1; }
+          done
+          echo "the band reaches the fleet's layout shape, exactly once"
       - name: the band is on by default, and url = "" is the only way off
         run: |
           band='<div class="commons-ribbon">'
@@ -506,6 +536,24 @@ jobs:
           "$RUNNER_TEMP/landingkit" check "$RUNNER_TEMP/example" | tee "$RUNNER_TEMP/check.log"
           grep -q '1 hero call-to-action row(s), rendered by the kit' "$RUNNER_TEMP/check.log" \
             || { echo "::error::check did not read the example's hero row"; exit 1; }
+          # ⛔ AND THE BAND RULE MUST REFUSE SOMETHING, or it is a rule that has
+          # only ever said yes. The page below is the shape v0.28.0 shipped to
+          # the fleet — a fork ribbon, the band's stylesheet rule, no band — in
+          # the MINIFIED spelling a published page actually has, because the
+          # first version of this gate demanded quotes and passed on the real
+          # go-numerics.github.io while it was broken.
+          mkdir -p "$RUNNER_TEMP/bandless"
+          printf '%s' '<html><head><style>.commons-ribbon{position:absolute;top:0;right:0}</style></head><body><div class=fork-ribbon><a href=x>Fork me</a></div></body></html>' \
+            > "$RUNNER_TEMP/bandless/index.html"
+          set +e
+          "$RUNNER_TEMP/landingkit" check "$RUNNER_TEMP/bandless" > "$RUNNER_TEMP/bandless.log" 2>&1
+          code=$?
+          set -e
+          cat "$RUNNER_TEMP/bandless.log"
+          [ "$code" = 1 ] || { echo "::error::check exited $code on a page with the band's sheet and no band"; exit 1; }
+          grep -q 'the fork ribbon is here and the Digital Commons band is not' "$RUNNER_TEMP/bandless.log" \
+            || { echo "::error::check did not name the defect it was given"; exit 1; }
+          echo "check refuses the shape v0.28.0 shipped"
       - name: verify against itself (must pass)
         run: |
           "$RUNNER_TEMP/landingkit" verify -chrome "${{ steps.chrome.outputs.chrome-path }}" \

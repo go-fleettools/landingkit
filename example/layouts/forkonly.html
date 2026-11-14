@@ -1,0 +1,35 @@
+{{/* ⛔⛔ THE LAYOUT THE FLEET ACTUALLY WRITES, and the one this kit had no test
+     for. It calls fork-ribbon.html and NOTHING else from the ribbon family —
+     which is what ~320 landings do, each having written its own
+     layouts/index.html long before the Digital Commons band existed.
+
+     v0.28.0 turned that band on "by default" and it reached only the layouts
+     that called commons-ribbon.html: the kit's example, and almost nobody else.
+     Every case in CI built that example, so the defect was invisible to the
+     whole suite while being visible on the first landing bumped —
+     go-numerics.github.io served the band's CSS rule and no band.
+
+     ⚠ So this file is a TEST SUBJECT, not a demonstration. It is deliberately
+     minimal: a landing's own head and bar, one fork-ribbon call, and nothing
+     that would let the band in by another route. If the band reaches this page,
+     it reaches theirs. */}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }}</title>
+{{ partial "styles.html" . }}
+</head>
+<body class="lm">
+<header class="nav"><div class="wrap nav-in">
+  <a class="brand" href="/">{{ .Site.Title }}</a>
+  {{ partial "theme-toggle.html" . }}
+</div></header>
+{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}
+<main class="wrap">
+  <h1>{{ .Title }}</h1>
+  {{ .Content }}
+</main>
+</body>
+</html>

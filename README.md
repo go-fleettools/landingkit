@@ -17,7 +17,7 @@ Renovate proposes the bump.
 |:--|:--|
 | `layouts/partials/styles.html` | the whole design. Brand colours come from `[params.brand]`, defaulting to go-fileshare's cyan. It also emits `<meta name="darkreader-lock">` and the fork ribbon's CSS |
 | `layouts/partials/theme-toggle.html` | system / light / dark |
-| `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
+| `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon, and since v0.29.0 the Digital Commons band beside it — the call every landing already makes is the only way that band reaches a layout written before it existed |
 | `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. on for every landing since v0.28.0, pointing at the Wikipedia article; `[params.commons]` `url` points it elsewhere and `url = ""` turns it off, after which neither the band nor its CSS exists and the site is unchanged. It carries the Octicons `law` scales since v0.27.0 — there is no Digital Commons logo to use, the name being Elsevier/RELX's trademark |
 | `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites (v0.23.0; logos v0.24.0), from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
@@ -26,7 +26,7 @@ Renovate proposes the bump.
 | `layouts/partials/icons/graph.html` | a rising line graph (Octicons "graph", MIT) for a "Benchmarks" button (v0.17.0) |
 | `layouts/partials/icons/rocket.html` | a rocket (Octicons "rocket", MIT) for a "Quickstart" or "Get started" button (v0.17.0) |
 | `layouts/partials/loading-carousel.html` | optional: a carousel of what a project does, shown while a page loads something large (a WebAssembly playground); `landingkit.LoadingCarousel` renders the same file for a page Hugo does not build (v0.12.0) |
-| `layouts/partials/commons-url.html` | where the band points, and whether it is there at all: the default, and `url = ""` as the opt-out. Read by both the band and the stylesheet so they cannot disagree (v0.28.0) |
+| `layouts/partials/commons-url.html` | where the band points, and whether it is there at all: the default, and `url = ""` as the opt-out. Read by both the band and the stylesheet so they cannot disagree (v0.28.0). It reads Hugo's global `site`, not `.Site`, because `fork-ribbon.html` is called with a string and has no page context |
 | `layouts/partials/mantra.html`, `mantra-items.html` | the strip's chips as text (rendered from `theme-toggle.html`), and the checked list of them |
 | `layouts/partials/mantra-on.html` | whether the page shows the mantra strip, for a landing's own licence line (shown only without the strip) |
 | `layouts/partials/hero-carousel.html` | optional: the hero's terminal as a carousel of cards (picture, terminal, caption); with no cards, the terminal byte for byte; more than one terminal with `terminal = "<name>"` (v0.11.0) |
@@ -252,9 +252,31 @@ A second band in the same corner, outside the fork one and at the same 45°, so
 the two read as a pair. "Fork me on GitHub" says the code can be taken; this
 says what it is taken into.
 
+```go-html-template
+{{ partial "fork-ribbon.html" "https://github.com/<org>/<repo>" }}
 ```
-{{ partial "fork-ribbon.html" "https://github.com/<org>/<repo>" }}{{ partial "commons-ribbon.html" . }}
-```
+
+⭐ **Nothing to add since v0.29.0: `fork-ribbon.html` emits both bands**, so the
+call every landing already makes delivers it. There is precedent —
+`theme-toggle.html` calls `mantra.html`, which is how the licence strip reaches
+every landing without any of them asking.
+
+⛔ **A layout that calls `commons-ribbon.html` as well gets two bands.** Drop the
+explicit call; `landingkit check` refuses the doubled page.
+
+⛔ **This is the fix for what v0.28.0 shipped.** That release turned the band on
+"by default" and it reached only the layouts calling `commons-ribbon.html` — this
+kit's `example/`, and almost nobody else. ~320 landings wrote their own
+`layouts/index.html` before the band existed and call the fork ribbon alone, so
+the pin bump gave them the band's stylesheet rule and **no band**: measured on
+the first one bumped, `go-numerics.github.io` served `commons-ribbon` once (the
+CSS) and "Digital Commons" not at all.
+
+Every case in CI built `example/` — the one layout that already did the right
+thing — so the whole suite was blind to it. There is now
+`example/layouts/forkonly.html`, which calls `fork-ribbon.html` and nothing else
+from the ribbon family, shaped like the fleet's; if the band reaches that page it
+reaches theirs.
 
 ⭐ **On for every landing since v0.28.0, and a landing says no with an empty
 url.** It shipped opt-in in v0.23.0, on a misreading: what belongs to one

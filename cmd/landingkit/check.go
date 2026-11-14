@@ -180,6 +180,90 @@ var (
 	classRE   = regexp.MustCompile(`\bclass=(?:"([^"]*)"|([^\s>"]+))`)
 )
 
+// bandRuleRE matches the Digital Commons band's own rule in a page's <style>
+// block, and bandElemRE the band itself. Both are the kit's exact output.
+var (
+	bandRuleRE = regexp.MustCompile(`\.commons-ribbon\{`)
+	bandElemRE = regexp.MustCompile(classLiteral("commons-ribbon"))
+	forkElemRE = regexp.MustCompile(classLiteral("fork-ribbon"))
+)
+
+// classLiteral matches `class="name"` whether or not the quotes survived.
+//
+// ⛔⛔ A PUBLISHED PAGE IS MINIFIED, AND THE FIRST VERSION OF THIS GATE PASSED ON
+// THE VERY PAGE THAT SHIPPED THE DEFECT. Hugo's pipeline drops the quotes around
+// an attribute value, so `class="fork-ribbon"` reaches a reader as
+// `class=fork-ribbon`; the gate was written against the BUILT page in the
+// repository, where the quotes are still there, and reported go-numerics.github.io
+// clean while that page carried the band's stylesheet and no band.
+//
+// It is the second time today the same assumption cost a measurement: a chip
+// check read `<code class="mantra-chip">` and found all four chips absent from a
+// page that held them all. A check on published HTML anchors on what minification
+// cannot touch.
+func classLiteral(name string) string {
+	return `class=(?:"` + name + `"|'` + name + `'|` + name + `(?:[\s>]|$))`
+}
+
+// bandStray reports the two ways a page's Digital Commons band can be wrong,
+// and both have been real.
+//
+// ⛔⛔ (1) THE STYLESHEET WITHOUT THE BAND, which is what v0.28.0 shipped to the
+// fleet. That release turned the band on "by default", and it reached only the
+// layouts that call commons-ribbon.html — the kit's own example and almost
+// nobody else. Most landings wrote their own layouts/index.html before the band
+// existed and call fork-ribbon.html alone, so the pin bump gave them the rule
+// and nothing to style: go-numerics.github.io served `commons-ribbon` once (the
+// CSS) and "Digital Commons" not at all.
+//
+// Every CI case built the kit's example, the one layout that already did the
+// right thing, so the whole suite was blind to it. This is the gate that is not
+// blind: it reads the BUILT page, so it answers for whatever layout produced it.
+//
+// ⛔ (2) TWO BANDS, which the fix for (1) makes possible: fork-ribbon.html emits
+// the band since v0.29.0, so a layout that also calls commons-ribbon.html gets
+// it twice. A count is the check — presence cannot tell one from two.
+//
+// ⛔⛔ AND THE SUBJECT IS THE PAIR, NOT THE STYLESHEET. The first shape of this
+// rule flagged "the rule is here and the band is not", and it immediately
+// reported five of the kit's own pages — the carousel and hero demos, which have
+// no fork ribbon either. It was right that they have the rule and no band, and
+// wrong that this is a defect: styles.html emits ONE stylesheet for the whole
+// site (`landingkit verify` compares it as text, so it cannot vary per page),
+// while the band belongs to the pages that carry the fork ribbon. The two bands
+// are a PAIR — same corner, same angle, one outside the other — so the invariant
+// is the pairing:
+//
+//	a page with the fork ribbon has exactly one Commons band
+//	no page has two
+//
+// That still catches what shipped: go-numerics.github.io has `class="fork-ribbon"`
+// and no band. A rule shaped as "CSS without element" would have been noise on
+// five pages and would have had to be switched off.
+func bandStray(page string) []string {
+	if !bandRuleRE.MatchString(page) {
+		// The site wrote [params.commons] url = "": there is no band anywhere, and
+		// the stylesheet says so. Nothing to pair.
+		if n := len(bandElemRE.FindAllString(page, -1)); n > 0 {
+			return []string{fmt.Sprintf("%d Digital Commons band(s) on a page whose stylesheet "+
+				"has no .commons-ribbon rule: the band and the sheet disagree", n)}
+		}
+		return nil
+	}
+	n := len(bandElemRE.FindAllString(page, -1))
+	switch {
+	case n > 1:
+		return []string{fmt.Sprintf("%d Digital Commons bands on one page: fork-ribbon.html emits "+
+			"the band, so a layout that also calls commons-ribbon.html doubles it — drop the "+
+			"explicit call", n)}
+	case n == 0 && forkElemRE.MatchString(page):
+		return []string{"the fork ribbon is here and the Digital Commons band is not: the two are " +
+			"a pair, and fork-ribbon.html emits both since v0.29.0 — a layout holding a " +
+			"hand-written fork ribbon should call the partial instead"}
+	}
+	return nil
+}
+
 // ctaStray lists what makes a page's hero rows differ from the kit's: a row
 // written by hand, a playground link that is not the red button, a kit button
 // without its icon.
@@ -275,6 +359,10 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		rows += n
 		for _, o := range order {
 			fmt.Fprintf(stderr, "%s: %s; the kit's order is docs (btn-primary), try (btn-try), then the rest: list them in [[params.cta]] and render the row with {{ partial \"cta.html\" . }}\n", p, o)
+			bad++
+		}
+		for _, s := range bandStray(page) {
+			fmt.Fprintf(stderr, "%s: %s\n", p, s)
 			bad++
 		}
 		for _, s := range ctaStray(page) {

@@ -1,5 +1,29 @@
 {{/* The "Fork me on GitHub" corner ribbon (github.blog, 2008), drawn in CSS
      with the brand gradient instead of the original PNGs, so it follows the
      theme. It replaces the nav bar's GitHub button. Called with the
-     repository URL: {{ partial "fork-ribbon.html" "https://github.com/o/r" }} */}}
+     repository URL: {{ partial "fork-ribbon.html" "https://github.com/o/r" }}
+
+     ⛔⛔ AND IT EMITS THE DIGITAL COMMONS BAND TOO (v0.29.0), BECAUSE THIS IS THE
+     CALL EVERY LANDING ALREADY MAKES.
+     v0.28.0 turned that band on "by default", and it reached exactly the
+     landings whose layout called commons-ribbon.html — which is the kit's own
+     example and almost nobody else. Most landings write their own
+     layouts/index.html and call the fork ribbon alone, so the pin bump gave them
+     the band's CSS rule and no band. Measured on the first one bumped:
+     go-numerics.github.io carried `commons-ribbon` once (the stylesheet) and
+     "Digital Commons" not at all.
+     Every CI case I had written built the kit's example, the one layout that
+     already did the right thing, so no test could see it. The example now has a
+     second layout that calls this partial ALONE, shaped like the fleet's.
+
+     ⚠ There is precedent, and it is the reason this is the right place:
+     theme-toggle.html calls mantra.html, which is how the licence strip reaches
+     every landing without any of them asking for it. A thing that belongs on
+     every page hangs off a call every page already makes.
+
+     ⚠ A LAYOUT THAT CALLS BOTH would emit two bands. `landingkit check` refuses
+     that, and refuses the v0.28.0 shape as well — a stylesheet carrying
+     `.commons-ribbon{` with no band on the page. A landing that calls
+     commons-ribbon.html explicitly should stop. */}}
 <div class="fork-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_forkMe" | safeHTML }}">{{ i18n "kit_forkMe" | safeHTML }}</a></div>
+{{- partial "commons-ribbon.html" . -}}
