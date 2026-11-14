@@ -16,14 +16,26 @@
   {{ partial "brand-menu.html" (dict "ctx" . "glyph" (.Site.Params.brandGlyph | default "") "glyphAlt" (.Site.Params.brandGlyphAlt | default "")) }}
   {{ partial "theme-toggle.html" . }}
 </div></header>
-{{/* ⛔ THE TWO BANDS ARE WRITTEN WITH NO SEPARATOR BETWEEN THEM. commons-ribbon
-     emits NOTHING without [params.commons] url, and emits its own leading
-     newline when it emits anything — so on its own line it would leave a blank
-     one behind when unset, and this page would no longer be the byte-identical
-     page a site that asked for nothing used to get. A comment emits nothing
-     but its own trailing newline, which is why this one ends with `-}}`: the
-     blank line it left behind was itself a byte of difference. */ -}}
-{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}{{ partial "commons-ribbon.html" . }}
+{{/* ⛔ THE COMMONS BAND IS NOT CALLED HERE ANY MORE, and that is the fix for
+     v0.28.0's defect rather than a tidy-up: fork-ribbon.html emits it, so a
+     landing that calls both gets TWO bands. This layout called both, which is
+     why every test passed while ~320 landings — which call the fork ribbon
+     alone — got the band's stylesheet and no band. The layout shaped like
+     theirs is layouts/forkonly.html, and CI builds it.
+
+     ⛔ AND IT ENDS WITH THE DASH FORM, WHICH IS NOT A DETAIL. A Hugo comment
+     emits nothing but its own trailing newline, so closing it without the dash
+     leaves a blank line in the page. The comment this one replaced said so in
+     its last sentence — and I deleted it and reintroduced the very byte it
+     warned about: CI caught `248a249 >` on the opt-out build, which is the
+     promise that a landing refusing the band gets the page it had BYTE FOR
+     BYTE.
+
+     ⚠ AND THE SENTENCE ABOVE MUST NOT SPELL THE CLOSING DELIMITER. Writing it
+     out, even inside backticks, CLOSES THIS COMMENT THERE: the first attempt
+     did, and five lines of prose about byte identity were emitted into the page
+     as text. A comment cannot quote its own terminator. */ -}}
+{{ partial "fork-ribbon.html" "https://github.com/go-fleettools/landingkit" }}
 <main>
   <section class="hero"><div class="wrap">
     <h1 class="head">One stylesheet</h1>

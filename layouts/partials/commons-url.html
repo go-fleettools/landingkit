@@ -24,7 +24,18 @@ as absent and would hand the refusing landing the band anyway.
 partial returns nothing, commons-ribbon.html emits nothing, and styles.html
 emits no .commons-ribbon rule. `landingkit verify` compares the <style> block as
 TEXT, so that has to stay exactly true.
+
+
+⛔⛔ AND IT READS THE GLOBAL `site`, NOT `.Site`, BECAUSE ITS CALLER MAY HAVE NO
+PAGE. fork-ribbon.html is called with a STRING — the repository URL — so inside
+it `.` is that string and `.Site` does not exist. Since v0.29.0 that partial
+emits this band too (see its own note), which is the only way the band reaches a
+landing whose layout calls the fork ribbon alone, so this one has to answer
+without a context. Hugo's global `site` is the same site object.
+
+⚠ The argument is therefore ignored, and callers may keep passing `.`: that
+keeps every call site uniform and means a future version could take one again.
 */ -}}
 {{- $url := "https://en.wikipedia.org/wiki/Digital_commons" -}}
-{{- with .Site.Params.commons }}{{ if isset . "url" }}{{ $url = .url }}{{ end }}{{ end -}}
+{{- with site.Params.commons }}{{ if isset . "url" }}{{ $url = .url }}{{ end }}{{ end -}}
 {{- return $url -}}
