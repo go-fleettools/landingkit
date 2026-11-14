@@ -104,7 +104,8 @@
   function waitingWorker() {
     return new Promise(function (resolve) {
       if (!reg) { resolve(null); return; }
-      var done = function (w) { resolve(w); };
+      var settled = false;
+      var done = function (w) { if (!settled) { settled = true; resolve(w); } };
       var watch = function (w) {
         if (w.state === "installed") { done(w); return; }
         w.addEventListener("statechange", function () {
@@ -112,11 +113,16 @@
           else if (w.state === "redundant") { done(null); }
         });
       };
+      // update() can resolve before the new worker is announced: updatefound
+      // says when it is (measured on a CI runner: waiting and installing both
+      // null right after update(), the worker installed half a minute later)
+      reg.addEventListener("updatefound", function () { watch(reg.installing); });
       reg.update().then(function () {
         if (reg.waiting) { done(reg.waiting); }
         else if (reg.installing) { watch(reg.installing); }
-        else { done(null); }
+        else { setTimeout(function () { done(reg.waiting || null); }, 10000); } // no new worker announced
       }, function () { done(null); });
+      setTimeout(function () { done(reg.waiting || null); }, 180000); // an install that never ends
     });
   }
 
