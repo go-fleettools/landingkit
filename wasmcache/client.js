@@ -145,12 +145,14 @@
         // the new build installs in the background (a wasm to download and
         // hash: half a minute on a busy runner); the prompt is up at once and
         // Reload waits for the install, so it has something to switch to
+        console.info("wasmcache: newer version " + j.version + " than " + running + "; registration " + (reg ? "known" : "NOT known"));
         waitP = waitingWorker();
         prompt();
         return true;
       }).catch(function () { return false; }); // offline, or no version file: nothing to say
     },
     reload: function () {
+      console.info("wasmcache: reload asked; registration " + (reg ? "known" : "NOT known") + ", wait " + (waitP ? "started" : "NOT started") + ", cache name " + JSON.stringify(cname));
       var save = Promise.resolve();
       try { if (o.beforeReload) { save = Promise.resolve(o.beforeReload()); } } catch (e) { /* reload anyway */ }
       var cap = new Promise(function (r) { setTimeout(r, 5000); });
@@ -159,14 +161,19 @@
       }).then(function (w) {
         // whatever the wait said, ask the registration as it is NOW: a CI
         // runner answered "none" while the new worker was still installing
-        if (w || !reg) { return w; }
-        // polled: the worker may not be announced yet, or be installing
+        if (w) { return w; }
+        // polled, on the registration as the browser has it now (not the one
+        // this script remembers): the worker may not be announced yet, or be
+        // installing
+        if (!("serviceWorker" in navigator)) { return null; }
         return new Promise(function (resolve) {
           var end = Date.now() + 180000;
           (function look() {
-            if (reg.waiting) { resolve(reg.waiting); return; }
-            if (Date.now() > end) { resolve(null); return; }
-            setTimeout(look, 300);
+            navigator.serviceWorker.getRegistration(o.scope || new URL(".", location.href).pathname).then(function (r) {
+              if (r && r.waiting) { reg = r; resolve(r.waiting); }
+              else if (Date.now() > end) { resolve(null); }
+              else { setTimeout(look, 300); }
+            }, function () { resolve(null); });
           })();
         });
       }).then(function (w) {
@@ -186,7 +193,7 @@
         return gone.then(function () { return window.caches ? caches.keys() : []; }).then(function (ks) {
           return Promise.all(ks.filter(function (k) { return cname !== "" && k.indexOf(cname + "|") === 0; /* this playground's only */ }).map(function (k) { return caches.delete(k); }));
         });
-      }).then(function () { location.reload(); }, function () { location.reload(); });
+      }).then(function () { console.info("wasmcache: reloading"); location.reload(); }, function (e) { console.info("wasmcache: reloading after an error: " + e); location.reload(); });
     },
     start: function (opts) {
       o = opts || {};
