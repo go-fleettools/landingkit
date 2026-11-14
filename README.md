@@ -18,7 +18,7 @@ Renovate proposes the bump.
 | `layouts/partials/styles.html` | the whole design. Brand colours come from `[params.brand]`, defaulting to go-fileshare's cyan. It also emits `<meta name="darkreader-lock">` and the fork ribbon's CSS |
 | `layouts/partials/theme-toggle.html` | system / light / dark |
 | `layouts/partials/fork-ribbon.html` | the "Fork me on GitHub" corner ribbon |
-| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0) |
+| `layouts/partials/commons-ribbon.html` | opt-in: a "Digital Commons" band in the SAME corner, outside the fork one and at the same 45°, so the two are parallel. `[params.commons]` `url` turns it on and supplies the link; without it neither the band nor its CSS exists and the site is unchanged (v0.23.0). It carries the Octicons `law` scales since v0.27.0 — there is no Digital Commons logo to use, the name being Elsevier/RELX's trademark |
 | `layouts/partials/brand-menu.html` | opt-in: the top bar's title as a `<details>` menu of the organisation's other sites (v0.23.0; logos v0.24.0), from `[[params.siblings]]` (`name`, `url`), the site's own home first. With no siblings it is the plain `<a class="brand">` the layouts wrote by hand, character for character (v0.23.0) |
 | `layouts/partials/icons/github.html` | the GitHub mark (Octicons, MIT: `icons/OCTICONS-LICENSE`) |
 | `layouts/partials/icons/browser.html` | a browser window (Octicons "browser", MIT) for "Try it in your browser": `{{ partial "icons/browser.html" . }}` inside the `btn btn-try` link, white on the red like the text (v0.10.0) |
@@ -259,6 +259,19 @@ says what it is taken into.
 [params.commons]
   url = "https://en.wikipedia.org/wiki/Digital_commons"
 ```
+
+⭐ **The band carries a pair of scales (v0.27.0)**, the Octicons `law`, before
+the words. It is decorative (`aria-hidden`): the link already carries
+`aria-label="Digital Commons"`.
+
+⛔ **There is no Digital Commons logo to use, and the kit must not invent one.**
+"Digital Commons" is a **trademark of Elsevier/RELX** — the bepress
+institutional-repository platform — and the commons the band points at is the
+Wikipedia subject of the same name, which has no emblem. A mark that is
+somebody's product, on twelve organisations' landings, is the one mistake this
+band must not make. Scales say "held in common, under terms" and belong to no
+one. Like every icon the fleet ships, it is copied verbatim from a licensed set
+with the commit it came from (`layouts/partials/icons/law.html`, MIT).
 
 ⛔ **The two partials go on one line, with nothing between them.** The second
 one emits its own leading newline when it emits anything, and nothing at all
@@ -507,6 +520,30 @@ and `TestMantra` now fail if the chips stop being text nodes.
   with `items`.
   - Items are checked at build time: at most four, made of
     `A-Za-z0-9_.=:+/, -`, and up to 40 characters each.
+- **The build flag comes first, and that is the kit's job (v0.27.0).** A chip
+  whose name starts with `CGO_ENABLED` is moved to the head of `items`,
+  whatever order the landing wrote; the rest keep their order. Nothing to
+  configure, and nothing a landing can do about it.
+
+  The chips are laid two to a row, so their order **is** their grouping.
+  Written in config order, go-tex's four came out
+
+  ```
+  LICENSE=BSD-3-Clause   CGO_ENABLED=0
+  macros: LPPL-1.3c      fonts: OFL-1.1
+  ```
+
+  — the build flag between the licences, so a reader counting them had to
+  hunt for the third. `CGO_ENABLED` says how the code is **built**; the rest
+  of a typical strip says what it is licensed **under**. That grouping is a
+  property of what the chips mean, not of who wrote them down, so it is held
+  once here for every landing rather than in twelve configs.
+
+  Matched by **prefix**, not by `CGO_ENABLED=0`: a landing that builds with
+  cgo writes `CGO_ENABLED=1` and is hoisted too. A chip that merely mentions
+  the flag further along (`needs CGO_ENABLED=0`) is not. CI builds the
+  example with the flag last, absent, mid-chip and set to `1`, and reads the
+  rendered rows.
 - **Data under another licence gets its own chip (v0.6.0).** The code chip
   stays, and a third or fourth chip names the data and its licence:
 

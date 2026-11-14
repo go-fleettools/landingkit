@@ -439,9 +439,16 @@ func TestNothingElseRepeatsTheMantra(t *testing.T) {
 // page, that four are with four, and that, turned off, nothing is rendered.
 func TestMantra(t *testing.T) {
 	contract(t, "layouts/partials/mantra-items.html", []string{
-		`slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0"`,
+		`slice "CGO_ENABLED=0" "LICENSE=BSD-3-Clause"`, // the default is written flag-first too
 		`errorf "landingkit: [params.mantra] items holds at most four entries`,
 		"findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$`",
+		// v0.27.0: the build flag is hoisted to the front whatever the
+		// landing wrote, by PREFIX so that CGO_ENABLED=1 is hoisted too.
+		// These literals pin the mechanism; the hugo lane pins the RESULT
+		// (a config with the flag last renders it first), which is the
+		// check that fails if the reordering is wrong rather than absent.
+		`hasPrefix . "CGO_ENABLED"`,
+		`{{- if $flag }}{{ $items = $flag }}{{ range $rest }}{{ $items = $items | append . }}{{ end }}{{ end -}}`,
 		`return $items`,
 	})
 	contract(t, "layouts/partials/mantra-on.html", []string{

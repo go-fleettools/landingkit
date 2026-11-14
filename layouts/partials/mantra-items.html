@@ -3,10 +3,44 @@ mantra-items.html: the strip's chips, [params.mantra] items or the fleet's
 two, checked: at most four, each a plain string (letters, digits, spaces
 and _.=:+/,-, at most 40 characters). mantra-on.html, mantra.html and
 styles.html all read them here, so they can never disagree.
+
+⛔ THE BUILD FLAG COMES FIRST, AND THAT IS THE KIT'S JOB, NOT EACH LANDING'S.
+CGO_ENABLED says how the code is BUILT; everything else in a typical strip is
+what it is licensed UNDER. Leaving the order to each organisation's config put
+the flag in the middle of three licences on go-tex's bar —
+
+    LICENSE=BSD-3-Clause   CGO_ENABLED=0
+    macros: LPPL-1.3c      fonts: OFL-1.1
+
+— so a reader counting the licences had to hunt for the third. Fixing that one
+landing's list would have fixed one landing; the chips are laid two to a row,
+so ORDER IS GROUPING, and the grouping is a property of what the chips MEAN
+rather than of who wrote them down. It is hoisted here, once, for every
+consumer.
+
+⚠ WHAT IS NOT IMPOSED: the order of everything else. A landing's remaining
+chips keep the sequence it wrote, because which licence matters most is its
+business. Only the flag's position is the kit's.
+
+⚠ THE KIT'S OWN DEFAULT IS WRITTEN IN THAT ORDER TOO, so that the two chips
+a landing gets without a config do not depend on the hoist to come out right.
+The hoist is a no-op on them; it is there for the lists landings write.
+
+⚠ AND IT IS A PREFIX MATCH ON `CGO_ENABLED`, not equality with
+`CGO_ENABLED=0`: a landing that builds with cgo writes `CGO_ENABLED=1` and the
+invariant is about the FLAG, not its value. A chip that merely mentions the
+words further along — "needs CGO_ENABLED=0" — is not hoisted, which is why the
+test pins the prefix rather than a substring.
 */ -}}
 {{- $mt := .Site.Params.mantra | default dict -}}
-{{- $items := slice "LICENSE=BSD-3-Clause" "CGO_ENABLED=0" -}}
+{{- $items := slice "CGO_ENABLED=0" "LICENSE=BSD-3-Clause" -}}
 {{- if isset $mt "items" }}{{ $items = $mt.items }}{{ end -}}
 {{- if gt (len $items) 4 }}{{ errorf "landingkit: [params.mantra] items holds at most four entries, got %d" (len $items) }}{{ end -}}
 {{- range $items }}{{ if not (findRE `^[A-Za-z0-9_.=:+/, -]{1,40}$` .) }}{{ errorf "landingkit: [params.mantra] item %q: letters, digits, spaces and _.=:+/,- only, at most 40" . }}{{ end }}{{ end -}}
+{{- $flag := slice -}}
+{{- $rest := slice -}}
+{{- range $items -}}
+{{- if hasPrefix . "CGO_ENABLED" }}{{ $flag = $flag | append . }}{{ else }}{{ $rest = $rest | append . }}{{ end -}}
+{{- end -}}
+{{- if $flag }}{{ $items = $flag }}{{ range $rest }}{{ $items = $items | append . }}{{ end }}{{ end -}}
 {{- return $items -}}
