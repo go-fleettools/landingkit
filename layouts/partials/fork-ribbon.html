@@ -25,5 +25,5 @@
      that, and refuses the v0.28.0 shape as well — a stylesheet carrying
      `.commons-ribbon{` with no band on the page. A landing that calls
      commons-ribbon.html explicitly should stop. */}}
-<div class="fork-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_forkMe" | safeHTML }}">{{ i18n "kit_forkMe" | safeHTML }}</a></div>
+<div class="fork-ribbon"><a href="{{ . }}" aria-label="{{ i18n "kit_forkMe" | safeHTML }}">{{ i18n "kit_forkMe" | safeHTML }}{{ partial "icons/github.html" . }}</a></div>
 {{- partial "commons-ribbon.html" . -}}
