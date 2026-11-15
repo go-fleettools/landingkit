@@ -1,0 +1,37 @@
+{{/* The landingkit version this page was built with, for a landing's own
+     <footer>: {{ partial "kit-version.html" . }}. OPT-IN: the kit has no footer
+     of its own (every landing writes one), so a landing that does not call this
+     gets the page it had, byte for byte, and `landingkit audit` reports it as
+     "none".
+
+     It reads hugo.Deps, the module graph Hugo resolved, for the dependency whose
+     Path is the kit's, and prints its Version linked to that release:
+
+         landingkit v0.36.0   ->  .../releases/tag/v0.36.0
+
+     Three cases, and none of them may fail the build:
+       - a tagged version: linked to its release;
+       - a pseudo-version (a branch or commit pin, v0.36.1-0.2026…-abcdef123456):
+         shown as it is, linked to the commit, since no tag exists for it;
+       - a `replace` to a local directory, or no such dependency at all: the
+         Version is then the REPLACED one (the example's go.mod still says
+         v0.14.0 and would print it), so it is not trusted: "landingkit (local)",
+         no link.
+
+     The colour is --slate, not the footer's --muted-2: --muted-2 on the light
+     background is 3.11:1 (`landingkit contrast`), --slate is 7.58:1 light and
+     7.66:1 dark. Inline, so styles.html — which `landingkit verify` compares as
+     text — does not change. */ -}}
+{{- $label := "landingkit (local)" -}}
+{{- $href := "" -}}
+{{- range hugo.Deps -}}
+{{- if and (eq .Path "github.com/go-fleettools/landingkit") (not .Replace) (ne .Version "") -}}
+{{- $v := .Version -}}
+{{- $label = printf "landingkit %s" $v -}}
+{{- $href = printf "https://github.com/go-fleettools/landingkit/releases/tag/%s" $v -}}
+{{- if findRE `[-.][0-9]{14}-[0-9a-f]{12}$` $v -}}
+{{- $href = printf "https://github.com/go-fleettools/landingkit/commit/%s" (index (findRE `[0-9a-f]{12}$` $v) 0) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+<span class="kit-version" style="color:var(--slate)">{{ with $href }}<a href="{{ . }}" style="color:inherit">{{ $label }}</a>{{ else }}{{ $label }}{{ end }}</span>

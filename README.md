@@ -719,6 +719,47 @@ most 5 redirects. First run, 2026-11-11, 371 org pages: 33 ok, 308 drifted,
 said twice beside the mantra strip, 5 playground links that are not `btn-try`
 (go-ndarray, go-numerics, go-slides among them), 4 buttons without their icon.
 
+Each readable page also reports the landingkit version its footer says
+(`kit v0.36.0`, `kit (local)`, or `kit none` when it has no line; see
+[the version line](#the-kit-version-in-the-footer-unreleased)), and the run ends
+with a tally such as `kit versions: none x290, v0.35.0 x3, v0.36.0 x2`, so drift
+across the pins is one line. A missing line is information, not drift.
+
+## The kit version in the footer (unreleased)
+
+The kit has no footer of its own: each landing writes `<footer>`. So the version
+line is a partial a landing calls inside its footer, and a landing that does not
+gets the page it had, byte for byte:
+
+```html
+<footer><div class="wrap"><span>© the authors</span>{{ partial "kit-version.html" . }}</div></footer>
+```
+
+It renders `landingkit v0.36.0`, linked to
+`https://github.com/go-fleettools/landingkit/releases/tag/v0.36.0`, in the
+sheet's `--slate` (7.58:1 on the light background, 7.66:1 on the dark, checked
+with `landingkit contrast`; the footer's own `--muted-2` is 3.11:1 on light).
+The colour is inline, so `styles.html`, which `landingkit verify` compares as
+text, does not change.
+
+It reads `hugo.Deps` (<https://gohugo.io/functions/hugo/deps/>) for the module
+`github.com/go-fleettools/landingkit`. A tag links to its release; a
+pseudo-version (a branch or commit pin) is shown as is and links to the commit;
+a `replace` to a local directory, or no such dependency, prints
+`landingkit (local)` without a link, because the `Version` of a replaced module
+is the replaced one's (this repository's example go.mod says v0.14.0). It never
+fails the build.
+
+To get it a landing bumps its pin to the release that ships the partial
+(`hugo mod get github.com/go-fleettools/landingkit@<tag>`) and adds the call to
+its footer. `landingkit check` WARNS, and still exits 0, for a site that has a
+footer and no such line: it is opt-in, so every landing starts without it and a
+failing gate would block the bump that offers it.
+
+There is no CHANGELOG file in this repository: release notes live in the
+`(vX.Y.Z)` headings of this README, and this section is the entry for the next
+release.
+
 ## Languages (v0.8.0)
 
 A landing in one language is **exactly the page it was**: the words the

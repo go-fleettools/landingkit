@@ -24,7 +24,7 @@ const usage = `usage:
   landingkit links  [flags] <built-site-dir>   every http(s) link in the built site resolves
   landingkit check  <built-site-dir>           fails when the footer or hero sub-text repeats what the mantra strip says, or the hero's buttons are out of the kit's order (docs, try, rest)
   landingkit contrast <background> <fg>...     the WCAG 2.2 ratio of each foreground on that background
-  landingkit audit  <https-url>...             check's rules on PUBLISHED landings: one verdict per page (ok, DRIFT, UNREAD)
+  landingkit audit  <https-url>...             check's rules on PUBLISHED landings: one verdict per page (ok, DRIFT, UNREAD) and the kit version its footer reads
   landingkit wasmcache [flags]                 an offline cache and update prompt for a playground's wasm (see wasmcache/)
 
 run 'landingkit verify -h' for the verify flags

@@ -1,0 +1,17 @@
+{{/* A landing's own footer calling the kit's version partial: a TEST SUBJECT
+     like forkonly.html. The kit has no footer of its own, so this is the shape
+     a landing adopts it in. Built against the checkout (a `replace`), it must
+     say "landingkit (local)"; CI builds a tagged landing too. */}}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ .Site.Title }}</title>
+{{ partial "styles.html" . }}
+</head>
+<body class="lm">
+<main class="wrap"><h1>{{ .Title }}</h1></main>
+<footer><div class="wrap"><span>© the authors</span>{{ partial "kit-version.html" . }}</div></footer>
+</body>
+</html>

@@ -350,7 +350,7 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprint(stderr, "usage: landingkit check <built-site-dir>\n")
 		return 2
 	}
-	bad, seen, rows := 0, 0, 0
+	bad, seen, rows, footers, versioned := 0, 0, 0, 0, 0
 	err := filepath.WalkDir(args[0], func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Ext(p) != ".html" {
 			return err
@@ -362,6 +362,12 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 		page := string(b)
 		if len(chips(page)) > 0 {
 			seen++
+		}
+		if footerRE.MatchString(page) {
+			footers++
+		}
+		if kitVersion(page) != "" {
+			versioned++
 		}
 		for _, r := range redundant(page) {
 			fmt.Fprintf(stderr, "%s: %s, which the mantra strip already says; wrap it in {{ if not (partial \"mantra-on.html\" .) }}\n", p, r)
@@ -386,6 +392,14 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	if err != nil {
 		fmt.Fprintf(stderr, "landingkit check: %v\n", err)
 		return 1
+	}
+	// A WARNING, never a failure: the version line is opt-in, so every landing
+	// that bumps its pin starts without one, and a gate that failed them would
+	// block the very bump that makes the line available. `audit` reports "none"
+	// for the same pages. One warning per site, not per page: a site with a
+	// footer on some pages and the line on one of them is adopting it.
+	if footers > 0 && versioned == 0 {
+		fmt.Fprint(stderr, "check: warning: no page carries the kit-version line; call {{ partial \"kit-version.html\" . }} in the footer to show which landingkit built it\n")
 	}
 	if bad > 0 {
 		return 1

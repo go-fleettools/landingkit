@@ -46,25 +46,25 @@ var auditClient = &http.Client{
 
 // auditPage returns the findings for one URL, or an error when it could not
 // be read in full.
-func auditPage(raw string) ([]string, int, error) {
+func auditPage(raw string) (found []string, rows int, kit string, err error) {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme != "https" || u.Host == "" {
-		return nil, 0, fmt.Errorf("not an https URL")
+		return nil, 0, "", fmt.Errorf("not an https URL")
 	}
 	resp, err := auditClient.Get(u.String())
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, 0, fmt.Errorf("HTTP %d", resp.StatusCode)
+		return nil, 0, "", fmt.Errorf("HTTP %d", resp.StatusCode)
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, auditMaxBody+1))
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 	if len(b) > auditMaxBody {
-		return nil, 0, fmt.Errorf("page larger than %d bytes", auditMaxBody)
+		return nil, 0, "", fmt.Errorf("page larger than %d bytes", auditMaxBody)
 	}
 	page := string(b)
 	var out []string
@@ -74,7 +74,13 @@ func auditPage(raw string) ([]string, int, error) {
 	order, rows := ctaDisorder(page)
 	out = append(out, order...)
 	out = append(out, ctaStray(page)...)
-	return out, rows, nil
+	// The kit version is information, not drift: a page without the line is
+	// "none", never a finding (the partial is opt-in).
+	kit = kitVersion(page)
+	if kit == "" {
+		kit = "none"
+	}
+	return out, rows, kit, nil
 }
 
 // auditList reads one URL per line from a file; blank lines and lines
@@ -112,20 +118,27 @@ func cmdAudit(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	bad, failed := 0, 0
+	kits := map[string]int{}
 	for _, raw := range args {
-		found, rows, err := auditPage(raw)
+		found, rows, kit, err := auditPage(raw)
 		switch {
 		case err != nil:
 			fmt.Fprintf(stdout, "UNREAD %s: %v\n", raw, err)
 			failed++
 		case len(found) == 0:
-			fmt.Fprintf(stdout, "ok     %s (%d hero row(s))\n", raw, rows)
+			kits[kit]++
+			fmt.Fprintf(stdout, "ok     %s (%d hero row(s)) kit %s\n", raw, rows, kit)
 		default:
+			kits[kit]++
 			bad++
 			for _, f := range found {
 				fmt.Fprintf(stdout, "DRIFT  %s: %s\n", raw, f)
 			}
+			fmt.Fprintf(stdout, "kit    %s: %s\n", raw, kit)
 		}
+	}
+	if len(kits) > 0 {
+		kitTally(stdout, kits)
 	}
 	fmt.Fprintf(stdout, "audit: %d page(s), %d ok, %d drifted, %d unread\n", len(args), len(args)-bad-failed, bad, failed)
 	if bad > 0 || failed > 0 {
