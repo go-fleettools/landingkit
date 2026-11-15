@@ -1025,6 +1025,15 @@ What it does, and what it refuses:
   reloads; the old build's cache is deleted when the new one activates. If
   the new worker cannot install, Reload unregisters the old one and its cache
   so the network answers.
+- **An unchanged file is not downloaded again.** When the new worker installs,
+  each listed file is first looked for in the other caches of this playground
+  (`<name>|<other build>`): an entry with the same size and SHA-256 as the new
+  manifest is copied, and the hash is checked again on that copy. An entry
+  that does not match, or cannot be read, is not reused: the file is fetched
+  and checked as before. A deploy that changes `worker.js` therefore downloads
+  `worker.js`, not the wasm. A `-lazy` file the old build had stored is copied
+  the same way; install never fetches a lazy file. The old cache is deleted
+  only when the new build activates, after the new cache is complete.
 - **Never**: the worker answers only a GET for a path in the manifest. An
   `-exclude` prefix (`/api/` by default) is never listed (generation fails if
   an asset is under one); a request with an `Authorization` header, a Range
@@ -1073,7 +1082,11 @@ to the network and are repaired, that `/api/*` (with and without
 `Authorization`) is never cached, that a bumped version shows the prompt in
 12 languages without reloading, and that accepting it lands in the new build
 with the work kept (`--prepare` and `--verify` take JS for the app's own
-work) and the old cache gone. This repository runs it on a fixture site.
+work) and the old cache gone. A last step builds a newer deploy in which one
+file differs (`--changed <path>`, default a `worker.js`) and asserts that every
+unchanged cached file is requested 0 times during the update, that a lazy file
+the old build stored is copied and served with 0 requests, and that a
+tampered old entry is not reused but fetched and hash-checked. This repository runs it on a fixture site.
 
 ## Licence
 
