@@ -167,13 +167,31 @@
        from the corner by the measure in the second band's comment below, so
        the two are 17px apart rather than 10px; the pair still reads as a pair
        and the test that refuses "clear across the corner" bounds it at 40. */}}
-  .fork-ribbon a{position:absolute;top:40px;right:-46px;width:200px;padding:7px 0;transform:rotate(45deg);
+  {{- /* ⭐ THE BAND CARRIES THE GITHUB MARK AFTER ITS WORDS (v0.38.0), and
+       that needed room: "Fork me on GitHub" plus a 16px mark and its gap is
+       about 147px, which the old chord (154px, 77.1px from the corner by the
+       measure above) held with almost nothing to spare. The band moved OUT,
+       toward the Digital Commons one: 89.1px from the corner, 11px of page
+       between the two bands, and a chord of 178px.
+       Same method as the second band's: with the box B=150 the band's centre
+       must sit at (B - s/2, s/2) for s=126 so its two ends leave through the
+       TOP and the RIGHT, and reach = L·cos45/2 must exceed cy=63 and not
+       exceed cx=87: 230px gives 81.3, centre (87, 63), upper end (5.7, -18),
+       lower end (168, 144). */}}
+  .fork-ribbon a{position:absolute;top:48px;right:-52px;width:230px;padding:7px 0;transform:rotate(45deg);
     background:var(--grad);color:#fff;text-align:center;font-weight:700;font-size:13px;letter-spacing:.02em;
     box-shadow:0 4px 12px -4px rgba(0,0,0,.45);outline:1px dashed rgba(255,255,255,.55);outline-offset:-4px;pointer-events:auto}
+  {{- /* the mark follows the words on their line (see .commons-ribbon .icon,
+       where the scales precede them): -3px drops the 16px box to the baseline's
+       descender, and `text-align:center` centres words and mark together */}}
+  .fork-ribbon .icon{vertical-align:-3px;margin-left:6px}
   .fork-ribbon a:hover{filter:brightness(1.08)}
   .fork-ribbon a:focus-visible{outline:2px solid #fff;outline-offset:-4px}
-  @media(max-width:1420px){.nav .wrap{padding-right:112px}}
-  @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:28px;right:-52px;font-size:11px;padding:5px 0}.nav .wrap{padding-right:84px}}
+  @media(max-width:1420px){.nav .wrap{padding-right:140px}}
+  {{- /* the phone's band: box 112, s=100 (70.7px from the corner), centre
+       (62, 50), 160px so reach 56.6 sits between cy=50 and cx=62; the mark
+       shrinks with the 11px words */}}
+  @media(max-width:600px){.fork-ribbon{width:112px;height:112px}.fork-ribbon a{top:38px;right:-30px;width:160px;font-size:11px;padding:5px 0}.fork-ribbon .icon{width:13px;height:13px;vertical-align:-2px;margin-left:5px}.nav .wrap{padding-right:96px}}
   {{- /* The Digital Commons ribbon: a SECOND band in the same corner, outside
        the fork one and at the same 45°, so the two are parallel rather than
        crossed. It is further from the corner, so its chord is longer: the box

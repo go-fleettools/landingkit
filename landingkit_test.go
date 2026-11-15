@@ -147,7 +147,7 @@ func TestTheNewPartialsAreOptIn(t *testing.T) {
 	// deliberate rather than accidental. It has already fired once, when the
 	// fork band was moved toward the corner on purpose (-36 -> -46), and the
 	// computed pair check below is what actually governs the distance.
-	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:40px;right:-46px;") {
+	if !strings.Contains(s, ".fork-ribbon a{position:absolute;top:48px;right:-52px;") {
 		t.Error("the fork band's geometry moved: the second band is placed against it, " +
 			"so check assertTheBandsReadAsAPair still passes and update this literal")
 	}
@@ -504,4 +504,41 @@ func TestMantra(t *testing.T) {
 	if strings.Contains(s, "::before{content:") || strings.Contains(s, "::after{content:") || strings.Contains(s, "jsonify | safeCSS") {
 		t.Error("the strip is CSS generated content again: it must be text")
 	}
+}
+
+// ⭐ THE FORK BAND CARRIES THE GITHUB MARK, AFTER ITS WORDS (v0.38.0). The mark
+// is the Octicons one the kit already ships (icons/github.html), never a second
+// drawing of it; it sits between the words and the closing </a>, so that
+// `text-align:center` centres words and mark together, and it is hidden from
+// assistive technology because the anchor's aria-label already names GitHub.
+func TestTheForkBandCarriesTheGitHubMarkAfterItsWords(t *testing.T) {
+	b, err := os.ReadFile("layouts/partials/fork-ribbon.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	words := strings.Index(s, `{{ i18n "kit_forkMe" | safeHTML }}</a>`)
+	if words < 0 {
+		// the label also appears in aria-label; the one that ends the anchor is the text
+		words = strings.LastIndex(s, `{{ i18n "kit_forkMe" | safeHTML }}`)
+	}
+	mark := strings.Index(s, `{{ partial "icons/github.html" . }}</a>`)
+	if words < 0 || mark < 0 {
+		t.Fatalf("the fork band does not call icons/github.html right before </a> (words at %d, mark at %d)", words, mark)
+	}
+	if mark < words {
+		t.Error("the GitHub mark comes BEFORE the words: it belongs to their right")
+	}
+	g, err := os.ReadFile("layouts/partials/icons/github.html")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`fill="currentColor"`, `aria-hidden="true"`, "mark-github"} {
+		if !strings.Contains(string(g), want) {
+			t.Errorf("icons/github.html lost %s", want)
+		}
+	}
+	contract(t, "layouts/partials/styles.html", []string{
+		`.fork-ribbon .icon{vertical-align:-3px;margin-left:6px}`,
+	})
 }
