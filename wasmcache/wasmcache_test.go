@@ -222,7 +222,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	put(t, d, "playground/app.wasm", strings.Repeat("0123456789abcdef", 1<<16)) // 1 MiB
 	// the file a deploy changes alone; also the dedicated Worker that fetches the
 	// lazy video file, like a playground's video worker
-	put(t, d, "playground/worker.js", "self.onmessage = function (e) { fetch(e.data).then(function (r) { return r.arrayBuffer(); }).then(function (b) { postMessage(b.byteLength); }); };\n")
+	put(t, d, "playground/worker.js", "try { importScripts(\"glue.js\" + (new URL(self.location.href).search)); } catch (e) {}\nself.onmessage = function (e) { fetch(e.data).then(function (r) { return r.arrayBuffer(); }).then(function (b) { postMessage(b.byteLength); }); };\n")
 	put(t, d, "playground/fonts/f.ttf", "font bytes")
 	put(t, d, "playground/video.wasm", strings.Repeat("video bytes 0123456789", 1<<14)) // lazy, fetched from the Worker
 	put(t, d, "api/x", "{}")
@@ -246,9 +246,17 @@ window.useVideo = function () {
 };
 if (localStorage.getItem("wantVideo")) window.useVideo();
 </script>`
-	put(t, d, "playground/index.html", readFile(t, d, "playground/index.html")+video)
-	put(t, d, "fr/playground/index.html", strings.ReplaceAll(readFile(t, d, "playground/index.html"), `lang="en"`, `lang="fr"`))
-	if _, err := Generate(Config{Dir: d, Version: "fixturev1", Assets: []string{"playground/index.html", "playground/app.wasm", "playground/worker.js", "fr/playground/index.html"}, Lazy: []string{"playground/fonts/", "playground/video.wasm"}, Scopes: []string{"/playground/", "/fr/playground/"}}); err != nil {
+	// The /fr/ page lives in another scope and loads files of /playground/: a
+	// script (its own worker controls the page, so it answers) and a dedicated
+	// Worker whose SCRIPT is /playground/worker.js, outside /fr/'s scope, so no
+	// worker controls it and what it imports (glue.js, with the worker's own ?v)
+	// goes to the network: the kit is told so with --network.
+	page := readFile(t, d, "playground/index.html")
+	put(t, d, "playground/glue.js", "self.glue = 1;\n")
+	put(t, d, "playground/index.html", page+video)
+	put(t, d, "fr/playground/index.html", strings.ReplaceAll(page, `lang="en"`, `lang="fr"`)+`<script src="/playground/glue.js"></script>
+<script>new Worker("/playground/worker.js?v=fixturev1");</script>`)
+	if _, err := Generate(Config{Dir: d, Version: "fixturev1", Assets: []string{"playground/index.html", "playground/app.wasm", "playground/worker.js", "playground/glue.js", "fr/playground/index.html"}, Lazy: []string{"playground/fonts/", "playground/video.wasm"}, Scopes: []string{"/playground/", "/fr/playground/"}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := filepath.Join(t.TempDir(), "wasmcache-e2e.cjs")
@@ -260,10 +268,16 @@ if (localStorage.getItem("wantVideo")) window.useVideo();
 	if err := os.WriteFile(hooks, []byte(`module.exports = { useFiles: ["/playground/fonts/f.ttf", "/playground/video.wasm"], async use(page) { await page.evaluate(() => { localStorage.setItem("wantVideo", "1"); return fetch("/playground/fonts/f.ttf").then((r) => r.arrayBuffer()).then(() => window.useVideo()); }); } };`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command(node, kit, "--hooks", hooks, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--neighbour", "/b/", "--ready", "window.appReady===true")
-	b, err := cmd.CombinedOutput()
-	t.Logf("%s", b)
-	if err != nil || !strings.Contains(string(b), "WASMCACHE_OK") {
-		t.Fatalf("the kit failed: %v", err)
+	for _, run := range [][]string{
+		{"--hooks", hooks, "--page", "/playground/", "--neighbour", "/b/"},
+		// the second scope, whose page loads files of the first's directory
+		{"--page", "/fr/playground/", "--network", "/playground/worker.js,/playground/glue.js"},
+	} {
+		args := append([]string{kit, "--root", d, "--asset", "/playground/app.wasm", "--ready", "window.appReady===true"}, run...)
+		b, err := exec.Command(node, args...).CombinedOutput()
+		t.Logf("%s", b)
+		if err != nil || !strings.Contains(string(b), "WASMCACHE_OK") {
+			t.Fatalf("the kit failed on %v: %v", run, err)
+		}
 	}
 }

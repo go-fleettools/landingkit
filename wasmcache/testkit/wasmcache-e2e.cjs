@@ -498,7 +498,10 @@ const out = {};
     if (viaWorker !== f.size) fail(f.path + "?v=bumped2 fetched from a Worker came back with " + viaWorker + " bytes");
     if (hits[f.path]) fail(f.path + "?v=bumped2 fetched from a Worker was requested " + hits[f.path] + " time(s): the copied entry did not answer it");
   }
-  const again = sameFiles.filter((f) => hits[f.path]);
+  // --network files are not this scope's worker's to answer (a Worker whose
+  // script is in another scope imports them from the network): step 2 allows
+  // them, so does this
+  const again = sameFiles.filter((f) => hits[f.path] && !viaOther.includes(f.path));
   if (again.length) fail("the new build asked the server for unchanged files: " + again.map((f) => f.path).join(", "));
   out.reuse = changedPath + " changed: " + sameFiles.length + " unchanged cached file(s) requested 0 times during the update" + (tamperFile ? " (but " + tamperFile.path + ", whose old entry was tampered with: fetched and hash-checked)" : "") + (lazy.length ? ", " + lazy.length + " lazy file(s) copied, 0 requests" : "");
   await browser.close();

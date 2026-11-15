@@ -1089,7 +1089,11 @@ the old build stored is copied and served with 0 requests, and that a
 tampered old entry is not reused but fetched and hash-checked. The simulated
 build serves the pages with `?v=<manifest version>` rewritten to its own
 version, as a real deploy changes it, so the page after the reload asks for
-its files with the new `?v=` and every request is counted. This repository runs it on a fixture site.
+its files with the new `?v=` and every request is counted. In a second scope
+whose page loads a Worker script from another scope (`/fr/playground/` using
+`/playground/worker.js`), that Worker's imports are not this scope's worker's to
+answer: `--network <paths>` lists them, and neither the second load nor the
+post-update check counts them. This repository runs it on a fixture site.
 
 ## Licence
 
