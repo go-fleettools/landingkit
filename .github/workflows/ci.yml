@@ -295,6 +295,20 @@ jobs:
             test "$n" = 1 || { echo "::error::$p carries $n bands, want 1"; exit 1; }
           done
           echo "the band reaches the fleet's layout shape, exactly once"
+      # The kit-version line (kit-version.html) in a landing's own footer. The
+      # example builds against the checkout through a `replace`, whose Version
+      # is the REPLACED module's (v0.14.0 in example/go.mod): the line must say
+      # "(local)", never that number, and must not link anywhere. A tagged
+      # landing is the other case; it can only be built after a release carries
+      # the partial, and its link and text are what cmd/landingkit's tests read.
+      - name: the kit version line says (local) for a replaced module
+        run: |
+          page="$RUNNER_TEMP/example/kitversion/index.html"
+          test -f "$page" || { echo "::error::the kit-version page was not built"; exit 1; }
+          grep -qF -- '<span class="kit-version" style="color:var(--slate)">landingkit (local)</span>' "$page" \
+            || { echo "::error::a replaced kit does not print landingkit (local)"; grep -F -- 'kit-version' "$page"; exit 1; }
+          if grep -qF -- 'v0.14.0' "$page"; then echo "::error::the replaced module's inert version leaked into the page"; exit 1; fi
+          echo "a replaced kit says landingkit (local), unlinked"
       - name: the band is on by default, and url = "" is the only way off
         run: |
           band='<div class="commons-ribbon">'
@@ -479,7 +493,9 @@ jobs:
           # the fleet's layout shape in CI (see the step above), so the base
           # branch has no such page and `diff -r` would report it for ever.
           # Anything else appearing here is a real difference.
-          diff -r --exclude=forkonly "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/head-commons"
+          # kitversion/ is excluded for the same reason: the page that adopts
+          # kit-version.html cannot exist in a base that predates the partial.
+          diff -r --exclude=forkonly --exclude=kitversion "$RUNNER_TEMP/base-commons" "$RUNNER_TEMP/head-commons"
           echo "with the band refused, every page example/ already had is the base's, byte for byte"
       - name: the mantra off, the page is the pre-mantra base's byte for byte
         if: github.event_name == 'pull_request'
