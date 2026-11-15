@@ -478,6 +478,15 @@ jobs:
       - name: the band refused, every page is the base's byte for byte
         if: github.event_name == 'pull_request'
         run: |
+          # ⚠ THE FORK BAND IS NOT THE BAND THIS STEP PROTECTS, and v0.38.0 changed
+          # it on purpose for every landing (the GitHub mark after its words, the
+          # band 12px further out): the stylesheet's .fork-ribbon rule differs
+          # from the base's in every page. Said, not hidden, like the steps below:
+          # only meaningful while the base's fork band already carries the mark.
+          if ! grep -q 'icons/github.html' base/layouts/partials/fork-ribbon.html; then
+            echo "the base's fork band has no GitHub mark: this pull request changes it on purpose, nothing to compare"
+            exit 0
+          fi
           if [ ! -f base/layouts/partials/commons-url.html ]; then
             echo "the base predates the opt-out: its plain build is the comparison"
             (cd base/example && hugo --destination "$RUNNER_TEMP/base-commons")
