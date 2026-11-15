@@ -44,12 +44,30 @@ const TYPES = {
   ".css": "text/css",
 };
 
+// The security headers a host sends with its pages (a <meta> CSP cannot say
+// frame-ancestors; COOP and COEP decide crossOriginIsolated). They are kept,
+// and only they: each can only add a restriction on top of the page's own
+// policy, and only same-origin script can write Cache Storage.
+const SECURITY = [
+  "content-security-policy", "content-security-policy-report-only", "x-frame-options",
+  "permissions-policy", "referrer-policy", "cross-origin-opener-policy",
+  "cross-origin-embedder-policy", "cross-origin-resource-policy", "x-content-type-options",
+];
+
 // stored: the response for these (verified) bytes of this manifest path. Its
-// headers are built here, from the path, and nothing else is carried over.
-function stored(buf, path) {
+// headers are built here: Content-Type from the path, plus the SECURITY ones
+// of `from` (the network response, or the cache entry being copied); nothing
+// else is carried over.
+function stored(buf, path, from) {
   const m = /\.[^./]*$/.exec(path);
-  const type = (m && TYPES[m[0].toLowerCase()]) || "application/octet-stream";
-  return new Response(buf, { status: 200, headers: { "content-type": type } });
+  const h = new Headers({ "content-type": (m && TYPES[m[0].toLowerCase()]) || "application/octet-stream" });
+  for (const k of SECURITY) {
+    const v = from && from.get(k);
+    if (v !== null && v !== undefined) {
+      h.set(k, v);
+    }
+  }
+  return new Response(buf, { status: 200, headers: h });
 }
 
 // fetchVerified: the file as the build wrote it, or null. The HTTP cache may
@@ -69,7 +87,7 @@ async function fetchVerified(path) {
     }
     const buf = await res.arrayBuffer();
     if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-      return stored(buf, path);
+      return stored(buf, path, res.headers);
     }
   }
   return null;
@@ -95,7 +113,7 @@ async function reuse(path) {
       }
       const buf = await hit.arrayBuffer();
       if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-        return stored(buf, path);
+        return stored(buf, path, hit.headers);
       }
     }
   } catch (e) {
@@ -218,7 +236,7 @@ async function verifiedNetwork(req, p) {
   const buf = await res.clone().arrayBuffer();
   if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
     if (new URL(req.url).searchParams.get("v") === null || new URL(req.url).searchParams.get("v") === CONFIG.version) {
-      await (await caches.open(CACHE)).put(p, stored(buf, p)); // a missing entry heals
+      await (await caches.open(CACHE)).put(p, stored(buf, p, res.headers)); // a missing entry heals
     }
     return res;
   }
@@ -265,7 +283,7 @@ self.addEventListener("fetch", (e) => {
       const buf = await hit.arrayBuffer();
       const want = FILES.get(p);
       if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-        return stored(buf, p);
+        return stored(buf, p, hit.headers);
       }
       await cache.delete(p); // broken: the network answers, and the entry is rewritten
       e.waitUntil(fetchVerified(p).then((r) => r && cache.put(p, r)));

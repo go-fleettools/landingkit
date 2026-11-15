@@ -1043,8 +1043,12 @@ What it does, and what it refuses:
   never stored.
 - **Scope**: one worker per `-scope`, served from that directory, so it
   controls that path and no other (GitHub Pages cannot send
-  `Service-Worker-Allowed`). It adds no header and changes none but
-  `Content-Length`, `Content-Encoding` and `Transfer-Encoding`.
+  `Service-Worker-Allowed`). A stored file's headers are rebuilt, not copied:
+  `Content-Type` from its extension, plus the security headers the host sent
+  (`Content-Security-Policy` and its report-only form, `X-Frame-Options`,
+  `Permissions-Policy`, `Referrer-Policy`, `Cross-Origin-Opener-Policy`,
+  `Cross-Origin-Embedder-Policy`, `Cross-Origin-Resource-Policy`,
+  `X-Content-Type-Options`); every other header is dropped.
 - **The code is shared, the cache is not.** Each playground has its own `-name`
   (default `wasmcache:<home>`), so its Cache Storage names are
   `<name>|<build>`, its own scope and its own version file. A worker opens,

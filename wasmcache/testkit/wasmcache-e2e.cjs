@@ -123,7 +123,10 @@ const server = http.createServer((req, res) => {
     body = served(p, bumped);
   }
   const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".wasm": "application/wasm", ".css": "text/css" };
-  res.writeHead(200, { "content-type": types[path.extname(p)] || "application/octet-stream", "cache-control": "no-cache" });
+  const hdr = { "content-type": types[path.extname(p)] || "application/octet-stream", "cache-control": "no-cache" };
+  // what a host sends that a <meta> cannot: the worker must keep it on a cached page
+  if (p.endsWith(".html")) { hdr["content-security-policy"] = "frame-ancestors 'self'"; hdr["cross-origin-opener-policy"] = "same-origin"; }
+  res.writeHead(200, hdr);
   res.end(body);
 });
 
@@ -191,6 +194,16 @@ const out = {};
   const viaSW = await page.evaluate((a) => fetch(a).then((r) => r.status), assets[0]);
   if (viaSW !== 200 || hits[assets[0]]) fail("a cached asset reached the network");
   out.secondLoad = "0 requests for the " + eager.length + " cached files";
+  // the security headers a host sent with the page survive a cache hit
+  const idx = pagePath.endsWith("/") ? pagePath + "index.html" : pagePath;
+  const wantSec = { csp: "frame-ancestors 'self'", coop: "same-origin" };
+  const checkSec = (label, got) => {
+    if (!got) fail(label + ": no entry");
+    if (got.csp !== wantSec.csp) fail(label + ": Content-Security-Policy is " + JSON.stringify(got.csp) + ", want " + JSON.stringify(wantSec.csp) + " (a security header the host sent was dropped)");
+    if (got.coop !== wantSec.coop) fail(label + ": Cross-Origin-Opener-Policy is " + JSON.stringify(got.coop) + ", want " + JSON.stringify(wantSec.coop) + " (a security header the host sent was dropped)");
+  };
+  checkSec("cache hit " + idx, await page.evaluate(async (p) => { const r = await fetch(p); return { csp: r.headers.get("content-security-policy"), coop: r.headers.get("cross-origin-opener-policy") }; }, idx));
+  if (hits[idx]) fail(idx + " reached the network on the second load");
   // hooks.useFiles + hooks.use(page): a feature of the APP that needs lazy
   // files. Before it is used they were neither asked for nor stored (a deck
   // without video never fetches the video worker); after, they are cached.
@@ -257,6 +270,10 @@ const out = {};
   if ((await cacheHash(page, a0)) !== null) fail("a refused answer was stored");
   const ok = await page.evaluate((a) => fetch(a).then((r) => r.status), a0);
   if (ok !== 200) fail("the right bytes were refused after the tampered ones: " + ok);
+  // an entry gone, the page fetched from the network and stored (verifiedNetwork): headers kept
+  await page.evaluate(async (n, p) => { await (await caches.open(n)).delete(p); }, cacheName(), idx);
+  await page.evaluate((p) => fetch(p).then((r) => r.arrayBuffer()), idx);
+  checkSec("network store " + idx, await page.evaluate(async (n, p) => { const r = await (await caches.open(n)).match(p); return r && { csp: r.headers.get("content-security-policy"), coop: r.headers.get("cross-origin-opener-policy") }; }, cacheName(), idx));
   out.networkFallback = "a network answer that does not match the manifest hash is refused with a 502 and not stored";
   await page.close();
 
@@ -470,7 +487,7 @@ const out = {};
     await page.evaluate(async (n, p) => {
       const c = await caches.open(n);
       const b = await (await c.match(p)).arrayBuffer();
-      await c.put(p, new Response(b, { status: 200, headers: { "content-type": "text/x-planted", "x-planted": "1" } }));
+      await c.put(p, new Response(b, { status: 200, headers: { "content-type": "text/x-planted", "x-planted": "1", "content-security-policy": "frame-ancestors 'self'", "cross-origin-opener-policy": "same-origin" } }));
     }, oldCache, plantFile.path);
   }
   hits = {};
@@ -491,9 +508,10 @@ const out = {};
   if (plantFile) {
     const got = await page.evaluate(async (n, p) => {
       const r = await (await caches.open(n)).match(p);
-      return r && { type: r.headers.get("content-type"), planted: r.headers.get("x-planted") };
+      return r && { type: r.headers.get("content-type"), planted: r.headers.get("x-planted"), csp: r.headers.get("content-security-policy"), coop: r.headers.get("cross-origin-opener-policy") };
     }, newCache, plantFile.path);
     if (!got) fail(plantFile.path + ": not in the new build's cache");
+    checkSec("reuse " + plantFile.path, got);
     if (got.type !== typeOf(plantFile.path)) fail(plantFile.path + ": the reused entry has Content-Type " + got.type + ", want " + typeOf(plantFile.path) + " (derived from the extension, not copied from the old entry)");
     if (got.planted !== null) fail(plantFile.path + ": a header of the old entry (x-planted: " + got.planted + ") was copied into the new build's cache");
   }
