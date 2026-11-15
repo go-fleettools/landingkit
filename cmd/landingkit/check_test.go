@@ -265,6 +265,7 @@ func TestCheckMentionsAreNotRepeats(t *testing.T) {
 	}{
 		"go-fem: a third-party licence in a card": {archPage(femCard), 0, "check:"},
 		"go-doom: a mixed licence in a footer":    {strings.Replace(archPage(""), `<footer>© the authors</footer>`, doomFooter, 1), 0, "check:"},
+		"a card with no heading":                  {archPage(`<div class=card><p>Every repository is BSD-3-Clause.</p></div>`), 0, "check:"},
 		// the repeats that stay refused
 		"a card headed with the licence":    {archPage(`<div class=card><h3>BSD-3-Clause</h3><p>Every repository.</p></div>`), 1, `a feature card repeats "BSD-3-Clause"`},
 		"a footer segment that is the fact": {strings.Replace(archPage(""), `<footer>© the authors</footer>`, `<footer><span>© the authors</span> · <span>BSD-3-Clause</span></footer>`, 1), 1, `footer repeats "BSD-3-Clause"`},
