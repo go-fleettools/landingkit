@@ -81,7 +81,7 @@ const changedBody = Buffer.concat([fs.readFileSync(path.join(root, path.normaliz
 const served = (p, n) => {
   let b = fs.readFileSync(path.join(root, path.normalize(p)));
   if (n >= 2 && p === changedPath) b = changedBody;
-  if (/\.html$/.test(p)) b = Buffer.from(b.toString("utf8").split("?v=" + manifest.version).join("?v=bumped" + n));
+  if (manifest.version && /\.html$/.test(p)) b = Buffer.from(b.toString("utf8").split("?v=" + manifest.version).join("?v=bumped" + n));
   return b;
 };
 
@@ -441,9 +441,10 @@ const out = {};
     if (!r) return null;
     return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await r.arrayBuffer())), (x) => x.toString(16).padStart(2, "0")).join("");
   }, n, p);
-  // the pages carry the deploy's ?v, which changes with every deploy: they are
-  // new bytes in a build, like the one file that differs
-  const sameFiles = eagerFiles.filter((f) => f.path !== changedPath && !/\.html$/.test(f.path));
+  // unchanged = the same bytes in build 2 as in the original build: derived from
+  // the bytes, so a page the ?v rewrite changed (and changedPath) drop out, and a
+  // page carrying no ?v stays in and must be requested 0 times
+  const sameFiles = eagerFiles.filter((f) => sha(served(f.path, 2)) === f.sha256);
   const tamperFile = sameFiles.find((f) => f.path === assets[0]) || sameFiles.find((f) => !/\.html$/.test(f.path)) || sameFiles[0];
   // the lazy files build 1 stores (a feature that needed them has used them)
   for (const f of lazy) {
