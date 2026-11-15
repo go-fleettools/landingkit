@@ -286,7 +286,9 @@ const out = {};
     // steps after this one start from the state they expect
     page = await open();
     await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
-    if ((await page.evaluate(() => wasmcache.cached())) !== true) fail("the cache was not whole again after the recovery bound step");
+    const wantIdx = manifest.files.find((f) => f.path === indexPath).sha256;
+    for (let i = 0; i < 100 && (await cacheHash(page, indexPath)) !== wantIdx; i++) await sleep(100);
+    if ((await cacheHash(page, indexPath)) !== wantIdx) fail(indexPath + " was not restored in the cache after the recovery bound step");
     await page.close();
     out.recoveryBound = "when unregistering keeps failing, the recovery page reloads exactly once, then shows a static clear-site-data message";
   }
