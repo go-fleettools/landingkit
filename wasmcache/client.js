@@ -29,6 +29,13 @@
 // wasmcache.reload()  what the prompt's button does
 (function () {
   "use strict";
+  try { // the worker's recovery reload leaves its one-shot marker in the URL: take it out
+    var here = new URL(location.href);
+    if (here.searchParams.has("wasmcache-reset")) {
+      here.searchParams.delete("wasmcache-reset");
+      history.replaceState(history.state, "", here.pathname + here.search + here.hash);
+    }
+  } catch (e) { /* no history API: the marker stays, harmless */ }
   var WORDS = {
     en: { update: "A new version is available.", reload: "Reload", later: "Later" },
     fr: { update: "Une nouvelle version est disponible.", reload: "Recharger", later: "Plus tard" },
