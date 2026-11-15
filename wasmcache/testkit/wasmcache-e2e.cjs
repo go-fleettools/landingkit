@@ -72,20 +72,26 @@ const changedPath = args.changed || (eagerFiles.find((f) => /\/worker\.js$/.test
 if (!eagerFiles.some((f) => f.path === changedPath)) fail("--changed " + changedPath + " is not a cached file of the manifest");
 const changedBody = Buffer.concat([fs.readFileSync(path.join(root, path.normalize(changedPath))), Buffer.from("\n//wasmcache-kit: a newer build\n")]);
 
+// served: a listed file as build "bumpedN" serves it. A real deploy changes the
+// ?v= its pages carry (the deploy's version, which is also the worker's), so
+// the pages are rewritten from ?v=<manifest.version> to ?v=bumpedN, and from
+// bumped2 on one file (changedPath) differs. The manifest the bumped worker
+// holds lists these bytes' hashes, so a page after the reload asks for
+// ?v=bumpedN like a real next deploy and every request stays counted.
+const served = (p, n) => {
+  let b = fs.readFileSync(path.join(root, path.normalize(p)));
+  if (n >= 2 && p === changedPath) b = changedBody;
+  if (/\.html$/.test(p)) b = Buffer.from(b.toString("utf8").split("?v=" + manifest.version).join("?v=bumped" + n));
+  return b;
+};
+
 // the server
 // hits is reset between steps; everHits never is: what the server was asked
 // for since it started (the "not fetched before the feature is used" proof)
 let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "", tamperAlways = "";
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
-  // A request that carries ?v=<a deploy that is not the one served now> is a
-  // page of ANOTHER deploy asking for its own files: the worker sends it to the
-  // network by design (step 3c). After a simulated bump the page that is up
-  // still carries the fixture's real ?v, so what it fetches (a lazy file from a
-  // dedicated Worker, say) is that case, not a file the new build failed to
-  // copy: it is not counted in `hits`.
-  const rv = u.searchParams.get("v");
-  if (rv === null || rv === (bumped ? "bumped" + bumped : manifest.version)) hits[u.pathname] = (hits[u.pathname] || 0) + 1;
+  hits[u.pathname] = (hits[u.pathname] || 0) + 1;
   everHits[u.pathname] = (everHits[u.pathname] || 0) + 1;
   if (u.pathname.startsWith(apiPrefix)) {
     apiN++;
@@ -102,11 +108,10 @@ const server = http.createServer((req, res) => {
     body = Buffer.from(JSON.stringify({ name: manifest.name, build: "bumped" + bumped, version: "bumped" + bumped }));
   } else if (bumped && p === scope + "wasmcache-sw.js") {
     const m = Object.assign({}, manifest, { build: "bumped" + bumped, version: "bumped" + bumped });
-    // from bumped2 on, a build in which ONE file differs (changedPath)
-    if (bumped >= 2) m.files = manifest.files.map((f) => (f.path === changedPath ? Object.assign({}, f, { sha256: sha(changedBody), size: changedBody.length }) : f));
+    m.files = manifest.files.map((f) => { const b = served(f.path, bumped); return Object.assign({}, f, { sha256: sha(b), size: b.length }); });
     body = Buffer.from(swText.replace(CONF[1], JSON.stringify(m)));
-  } else if (bumped >= 2 && p === changedPath) {
-    body = changedBody;
+  } else if (bumped && manifest.files.some((f) => f.path === p)) {
+    body = served(p, bumped);
   }
   const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".wasm": "application/wasm", ".css": "text/css" };
   res.writeHead(200, { "content-type": types[path.extname(p)] || "application/octet-stream", "cache-control": "no-cache" });
@@ -436,7 +441,9 @@ const out = {};
     if (!r) return null;
     return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await r.arrayBuffer())), (x) => x.toString(16).padStart(2, "0")).join("");
   }, n, p);
-  const sameFiles = eagerFiles.filter((f) => f.path !== changedPath);
+  // the pages carry the deploy's ?v, which changes with every deploy: they are
+  // new bytes in a build, like the one file that differs
+  const sameFiles = eagerFiles.filter((f) => f.path !== changedPath && !/\.html$/.test(f.path));
   const tamperFile = sameFiles.find((f) => f.path === assets[0]) || sameFiles.find((f) => !/\.html$/.test(f.path)) || sameFiles[0];
   // the lazy files build 1 stores (a feature that needed them has used them)
   for (const f of lazy) {
