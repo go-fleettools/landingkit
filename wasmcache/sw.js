@@ -14,6 +14,9 @@
 //    serving. The hash is checked again at every read: an entry that no longer
 //    matches (truncated, evicted in part, tampered with) is deleted and the
 //    network answers instead.
+//  - a file whose SHA-256 and size are the same in the new build is copied from
+//    the old build's cache (hash checked again), not downloaded again; lazy
+//    files the old build had stored are copied too, never fetched at install.
 //  - a new build installs beside the old and WAITS: the page says so and
 //    switches when asked ("activate"), so a page never runs with files of two
 //    builds. The very first worker takes over at once.
@@ -61,23 +64,58 @@ async function fetchVerified(path) {
   return null;
 }
 
+// reuse: this file as an EARLIER build of this playground stored it, when its
+// bytes are exactly the ones this build lists (same size and SHA-256), or null.
+// A deploy that changed one file then downloads that file, not the wasm again.
+// The hash is checked here, on every candidate: an entry that does not match
+// (another version, truncated, tampered with) is not reused, and neither is
+// one that cannot be read; the caller fetches it instead. Only caches that
+// begin with this worker's name are opened.
+async function reuse(path) {
+  const want = FILES.get(path);
+  try {
+    for (const k of await caches.keys()) {
+      if (!k.startsWith(CONFIG.name + "|") || k === CACHE) {
+        continue;
+      }
+      const hit = await (await caches.open(k)).match(path);
+      if (!hit) {
+        continue;
+      }
+      const buf = await hit.arrayBuffer();
+      if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
+        return stored(buf, hit.headers);
+      }
+    }
+  } catch (e) {
+    // a cache deleted or unreadable meanwhile: the network answers instead
+  }
+  return null;
+}
+
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     try {
-      // lazy files wait for their first request (see the fetch handler)
-      const todo = CONFIG.files.filter((f) => !f.lazy).map((f) => f.path);
+      // lazy files are never fetched here (they wait for their first request,
+      // see the fetch handler); one an earlier build already stored is copied
+      const todo = CONFIG.files.map((f) => f.path);
       // two at a time: a wasm is tens of megabytes in memory while it is hashed
       await Promise.all([0, 1].map(async () => {
         for (let p; (p = todo.pop()) !== undefined;) {
           if (await cache.match(p)) {
             continue; // an earlier, interrupted install of this build
           }
-          const res = await fetchVerified(p);
-          if (!res) {
-            throw new Error(p + ": not the file the build wrote");
+          let res = await reuse(p);
+          if (!res && !FILES.get(p).lazy) {
+            res = await fetchVerified(p);
+            if (!res) {
+              throw new Error(p + ": not the file the build wrote");
+            }
           }
-          await cache.put(p, res);
+          if (res) {
+            await cache.put(p, res);
+          }
         }
       }));
     } catch (err) {

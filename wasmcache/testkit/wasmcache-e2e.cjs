@@ -20,6 +20,11 @@
 //   6. accepting it reloads into the new build, work kept (--prepare runs
 //      before the update, --verify afterwards; default: a localStorage key),
 //      and the old build's cache is gone
+//   7. a newer build in which ONE file changed (--changed, default a worker.js):
+//      every unchanged cached file is requested 0 times during the update (it is
+//      copied from the old cache), a lazy file the old build stored is copied
+//      too and served with 0 requests, and an old entry that was tampered with
+//      is not copied: it is fetched and its hash checked
 // --ready is a JS expression true when the app is up (default: the page's
 // `wasmcache.cached()` has settled). The page must call wasmcache.start().
 // Prints WASMCACHE_OK {...}; exits 1 at the first failure.
@@ -60,6 +65,12 @@ if (!CONF) fail(swFile + " holds no manifest: was `landingkit wasmcache` run on 
 const manifest = JSON.parse(CONF[1]);
 const assets = args.asset.length ? args.asset : [manifest.files[0].path];
 for (const a of assets) if (!manifest.files.some((f) => f.path === a)) fail(a + " is not in the manifest");
+// --changed <path>: the one file the step-7 build differs in (default: a
+// worker.js, else the smallest cached file that is not the page)
+const eagerFiles = manifest.files.filter((f) => !f.lazy);
+const changedPath = args.changed || (eagerFiles.find((f) => /\/worker\.js$/.test(f.path)) || eagerFiles.filter((f) => !/\.html$/.test(f.path)).sort((a, b) => a.size - b.size)[0] || eagerFiles[eagerFiles.length - 1]).path;
+if (!eagerFiles.some((f) => f.path === changedPath)) fail("--changed " + changedPath + " is not a cached file of the manifest");
+const changedBody = Buffer.concat([fs.readFileSync(path.join(root, path.normalize(changedPath))), Buffer.from("\n//wasmcache-kit: a newer build\n")]);
 
 // the server
 // hits is reset between steps; everHits never is: what the server was asked
@@ -84,7 +95,11 @@ const server = http.createServer((req, res) => {
     body = Buffer.from(JSON.stringify({ name: manifest.name, build: "bumped" + bumped, version: "bumped" + bumped }));
   } else if (bumped && p === scope + "wasmcache-sw.js") {
     const m = Object.assign({}, manifest, { build: "bumped" + bumped, version: "bumped" + bumped });
+    // from bumped2 on, a build in which ONE file differs (changedPath)
+    if (bumped >= 2) m.files = manifest.files.map((f) => (f.path === changedPath ? Object.assign({}, f, { sha256: sha(changedBody), size: changedBody.length }) : f));
     body = Buffer.from(swText.replace(CONF[1], JSON.stringify(m)));
+  } else if (bumped >= 2 && p === changedPath) {
+    body = changedBody;
   }
   const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".wasm": "application/wasm", ".css": "text/css" };
   res.writeHead(200, { "content-type": types[path.extname(p)] || "application/octet-stream", "cache-control": "no-cache" });
@@ -402,6 +417,67 @@ const out = {};
   }
   names.splice(0, names.length, ...mine);
   out.update = "accepted: reloaded into " + info.version + ", work kept, old cache deleted (" + names[0] + ")";
+
+  // 7. a newer build in which ONE file changed (changedPath): the files whose
+  // bytes did not change are copied from the old build's cache, not downloaded
+  // again, lazy files the old build stored included; an old entry that does
+  // not match its hash is not copied, it is fetched and checked.
+  const oldCache = manifest.name + "|bumped1", newCache = manifest.name + "|bumped2";
+  const hashIn = (n, p) => page.evaluate(async (n, p) => {
+    if (!(await caches.keys()).includes(n)) return null;
+    const r = await (await caches.open(n)).match(p);
+    if (!r) return null;
+    return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await r.arrayBuffer())), (x) => x.toString(16).padStart(2, "0")).join("");
+  }, n, p);
+  const sameFiles = eagerFiles.filter((f) => f.path !== changedPath);
+  const tamperFile = sameFiles.find((f) => f.path === assets[0]) || sameFiles.find((f) => !/\.html$/.test(f.path)) || sameFiles[0];
+  // the lazy files build 1 stores (a feature that needed them has used them)
+  for (const f of lazy) {
+    await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()), f.path);
+    for (let i = 0; i < 100 && (await hashIn(oldCache, f.path)) !== f.sha256; i++) await sleep(100);
+    if ((await hashIn(oldCache, f.path)) !== f.sha256) fail(f.path + " is not stored in the old build's cache: the reuse step cannot start");
+  }
+  if (tamperFile) {
+    await page.evaluate(async (n, p) => { await (await caches.open(n)).put(p, new Response("tampered bytes, same path")); }, oldCache, tamperFile.path);
+  }
+  hits = {};
+  bumped = 2;
+  if ((await page.evaluate(() => wasmcache.check())) !== true) fail("the newer build (one file changed) was not detected");
+  let waiting = null;
+  for (let i = 0; i < 1200 && waiting !== "installed"; i++) { waiting = (await regState() || {}).waiting; if (waiting !== "installed") await sleep(100); }
+  if (waiting !== "installed") fail("the build with one changed file did not finish installing");
+  if (tamperFile) {
+    if (!hits[tamperFile.path]) fail(tamperFile.path + ": a tampered entry of the old cache was reused: it was not fetched");
+    if ((await hashIn(newCache, tamperFile.path)) !== tamperFile.sha256) fail(tamperFile.path + ": the new build's cache holds bytes that do not match the manifest's hash (the tampered old entry was reused)");
+  }
+  for (const f of sameFiles) {
+    if (tamperFile && f.path === tamperFile.path) continue;
+    if (hits[f.path]) fail(f.path + " was requested " + hits[f.path] + " time(s) during the update although its bytes did not change: it must be copied from the old cache");
+    if ((await hashIn(newCache, f.path)) !== f.sha256) fail(f.path + " is not in the new build's cache with the manifest's hash");
+  }
+  if (!hits[changedPath]) fail(changedPath + " changed and was not requested during the update");
+  if ((await hashIn(newCache, changedPath)) !== sha(changedBody)) fail(changedPath + " is not in the new build's cache with the new hash");
+  for (const f of lazy) {
+    if (hits[f.path]) fail(f.path + " is lazy and was requested " + hits[f.path] + " time(s) during the update: install never fetches a lazy file");
+    if ((await hashIn(newCache, f.path)) !== f.sha256) fail(f.path + " was stored by the old build and was not copied to the new build's cache");
+  }
+  // accept it: the old cache goes, the new build answers, nothing is downloaded again
+  await page.waitForSelector("#wasmcache-update", { timeout: 20000 });
+  hits = {};
+  await Promise.all([page.waitForNavigation({ waitUntil: "load", timeout: 240000 }), page.click("#wasmcache-reload")]);
+  await page.waitForFunction(ready, { timeout: 90000 });
+  await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+  let left = [];
+  for (let i = 0; i < 100; i++) { left = (await page.evaluate(() => caches.keys())).filter((n) => n.startsWith(manifest.name + "|")); if (left.length === 1 && left[0] === newCache) break; await sleep(100); }
+  if (left.length !== 1 || left[0] !== newCache) fail("after the update the caches are " + left.join(", ") + ", want only " + newCache);
+  for (const f of lazy) {
+    const got = await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()).then((b) => b.byteLength), f.path);
+    if (got !== f.size) fail(f.path + " came back with " + got + " bytes in the new build");
+    if (hits[f.path]) fail(f.path + " cached by the old build was requested " + hits[f.path] + " time(s) in the new one");
+  }
+  const again = sameFiles.filter((f) => hits[f.path]);
+  if (again.length) fail("the new build asked the server for unchanged files: " + again.map((f) => f.path).join(", "));
+  out.reuse = changedPath + " changed: " + sameFiles.length + " unchanged cached file(s) requested 0 times during the update" + (tamperFile ? " (but " + tamperFile.path + ", whose old entry was tampered with: fetched and hash-checked)" : "") + (lazy.length ? ", " + lazy.length + " lazy file(s) copied, 0 requests" : "");
   await browser.close();
   server.close();
   console.log("WASMCACHE_OK " + JSON.stringify(out));

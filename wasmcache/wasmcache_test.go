@@ -220,6 +220,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 });
 </script>`)
 	put(t, d, "playground/app.wasm", strings.Repeat("0123456789abcdef", 1<<16)) // 1 MiB
+	put(t, d, "playground/worker.js", "self.onmessage = function () {};\n")     // the file a deploy changes alone
 	put(t, d, "playground/fonts/f.ttf", "font bytes")
 	put(t, d, "api/x", "{}")
 	// a second playground on the same origin: its own page, files, name,
@@ -229,7 +230,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	if _, err := Generate(Config{Dir: d, Assets: []string{"b/index.html", "b/app.wasm"}, Scopes: []string{"/b/"}, Name: "the-other-playground"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm"}, Lazy: []string{"playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
+	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm", "playground/worker.js"}, Lazy: []string{"playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := filepath.Join(t.TempDir(), "wasmcache-e2e.cjs")
