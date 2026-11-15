@@ -460,6 +460,19 @@ const out = {};
   if (tamperFile) {
     await page.evaluate(async (n, p) => { await (await caches.open(n)).put(p, new Response("tampered bytes, same path")); }, oldCache, tamperFile.path);
   }
+  // an old entry with the right bytes but headers nobody vouches for: it is
+  // reused (0 requests), and the copy carries the manifest-derived Content-Type
+  // and none of the planted headers
+  const wantTypes = { ".wasm": "application/wasm", ".js": "text/javascript", ".json": "application/json", ".html": "text/html; charset=utf-8", ".css": "text/css" };
+  const typeOf = (p) => wantTypes[path.extname(p).toLowerCase()] || "application/octet-stream";
+  const plantFile = sameFiles.find((f) => f !== tamperFile && /\.(wasm|js|json|css)$/.test(f.path)) || sameFiles.find((f) => f !== tamperFile);
+  if (plantFile) {
+    await page.evaluate(async (n, p) => {
+      const c = await caches.open(n);
+      const b = await (await c.match(p)).arrayBuffer();
+      await c.put(p, new Response(b, { status: 200, headers: { "content-type": "text/x-planted", "x-planted": "1" } }));
+    }, oldCache, plantFile.path);
+  }
   hits = {};
   bumped = 2;
   if ((await page.evaluate(() => wasmcache.check())) !== true) fail("the newer build (one file changed) was not detected");
@@ -474,6 +487,15 @@ const out = {};
     if (tamperFile && f.path === tamperFile.path) continue;
     if (hits[f.path]) fail(f.path + " was requested " + hits[f.path] + " time(s) during the update although its bytes did not change: it must be copied from the old cache");
     if ((await hashIn(newCache, f.path)) !== f.sha256) fail(f.path + " is not in the new build's cache with the manifest's hash");
+  }
+  if (plantFile) {
+    const got = await page.evaluate(async (n, p) => {
+      const r = await (await caches.open(n)).match(p);
+      return r && { type: r.headers.get("content-type"), planted: r.headers.get("x-planted") };
+    }, newCache, plantFile.path);
+    if (!got) fail(plantFile.path + ": not in the new build's cache");
+    if (got.type !== typeOf(plantFile.path)) fail(plantFile.path + ": the reused entry has Content-Type " + got.type + ", want " + typeOf(plantFile.path) + " (derived from the extension, not copied from the old entry)");
+    if (got.planted !== null) fail(plantFile.path + ": a header of the old entry (x-planted: " + got.planted + ") was copied into the new build's cache");
   }
   if (!hits[changedPath]) fail(changedPath + " changed and was not requested during the update");
   if ((await hashIn(newCache, changedPath)) !== sha(changedBody)) fail(changedPath + " is not in the new build's cache with the new hash");

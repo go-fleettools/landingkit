@@ -32,13 +32,24 @@ const CACHE = CONFIG.name + "|" + CONFIG.build;
 const FILES = new Map(CONFIG.files.map((f) => [f.path, f]));
 const HEX = (buf) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
 const sha256 = async (buf) => HEX(await crypto.subtle.digest("SHA-256", buf));
-// Headers that describe the bytes on the wire, not the ones stored.
-const DROP = ["content-encoding", "content-length", "transfer-encoding"];
+// The Content-Type of a stored file comes from its extension, never from a
+// header some earlier response (the server's, or an old build's cache entry)
+// carried: the manifest vouches for the bytes, nothing vouches for those headers.
+const TYPES = {
+  ".wasm": "application/wasm",
+  ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".json": "application/json",
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css",
+};
 
-function stored(buf, headers) {
-  const h = new Headers();
-  headers.forEach((v, k) => { if (!DROP.includes(k.toLowerCase())) h.set(k, v); });
-  return new Response(buf, { status: 200, headers: h });
+// stored: the response for these (verified) bytes of this manifest path. Its
+// headers are built here, from the path, and nothing else is carried over.
+function stored(buf, path) {
+  const m = /\.[^./]*$/.exec(path);
+  const type = (m && TYPES[m[0].toLowerCase()]) || "application/octet-stream";
+  return new Response(buf, { status: 200, headers: { "content-type": type } });
 }
 
 // fetchVerified: the file as the build wrote it, or null. The HTTP cache may
@@ -58,7 +69,7 @@ async function fetchVerified(path) {
     }
     const buf = await res.arrayBuffer();
     if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-      return stored(buf, res.headers);
+      return stored(buf, path);
     }
   }
   return null;
@@ -84,7 +95,7 @@ async function reuse(path) {
       }
       const buf = await hit.arrayBuffer();
       if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-        return stored(buf, hit.headers);
+        return stored(buf, path);
       }
     }
   } catch (e) {
@@ -207,7 +218,7 @@ async function verifiedNetwork(req, p) {
   const buf = await res.clone().arrayBuffer();
   if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
     if (new URL(req.url).searchParams.get("v") === null || new URL(req.url).searchParams.get("v") === CONFIG.version) {
-      await (await caches.open(CACHE)).put(p, stored(buf, res.headers)); // a missing entry heals
+      await (await caches.open(CACHE)).put(p, stored(buf, p)); // a missing entry heals
     }
     return res;
   }
@@ -254,7 +265,7 @@ self.addEventListener("fetch", (e) => {
       const buf = await hit.arrayBuffer();
       const want = FILES.get(p);
       if (buf.byteLength === want.size && (await sha256(buf)) === want.sha256) {
-        return stored(buf, hit.headers);
+        return stored(buf, p);
       }
       await cache.delete(p); // broken: the network answers, and the entry is rewritten
       e.waitUntil(fetchVerified(p).then((r) => r && cache.put(p, r)));
