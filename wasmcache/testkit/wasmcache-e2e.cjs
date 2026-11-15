@@ -89,9 +89,18 @@ const served = (p, n) => {
 // hits is reset between steps; everHits never is: what the server was asked
 // for since it started (the "not fetched before the feature is used" proof)
 let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "", tamperAlways = "";
+// --network <paths>: files this page's own worker is not the one that fetches
+// (a Web Worker script is controlled by the worker whose scope holds the
+// SCRIPT's URL: /fr/playground/ loads /playground/worker.js, which the
+// /playground/ worker controls, not this one). Only such a Worker's requests
+// are exempt, and they carry the deploy's ?v; the same path asked WITHOUT a
+// query (the page's own <script>, which this scope's worker must answer) is
+// counted under its path like any other file.
+const viaOther = (args.network || "").split(",").filter(Boolean);
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
-  hits[u.pathname] = (hits[u.pathname] || 0) + 1;
+  const key = viaOther.includes(u.pathname) && u.search ? u.pathname + "?" : u.pathname;
+  hits[key] = (hits[key] || 0) + 1;
   everHits[u.pathname] = (everHits[u.pathname] || 0) + 1;
   if (u.pathname.startsWith(apiPrefix)) {
     apiN++;
@@ -176,12 +185,8 @@ const out = {};
   // 2. the second load asks the server for none of them
   hits = {};
   page = await open();
-  // --network <paths>: files this page's own worker is not the one that
-  // fetches (a Web Worker script is controlled by the worker whose scope holds
-  // the SCRIPT's URL: /fr/playground/ loads /playground/worker.js, which the
-  // /playground/ worker controls, not this one)
-  const viaOther = (args.network || "").split(",").filter(Boolean);
-  const asked = eager.filter((f) => hits[f.path] && !viaOther.includes(f.path));
+  // a --network file's Worker requests are counted apart (see viaOther)
+  const asked = eager.filter((f) => hits[f.path]);
   if (asked.length) fail("the second load asked the server for " + asked.map((f) => f.path).join(", "));
   const viaSW = await page.evaluate((a) => fetch(a).then((r) => r.status), assets[0]);
   if (viaSW !== 200 || hits[assets[0]]) fail("a cached asset reached the network");
@@ -498,10 +503,9 @@ const out = {};
     if (viaWorker !== f.size) fail(f.path + "?v=bumped2 fetched from a Worker came back with " + viaWorker + " bytes");
     if (hits[f.path]) fail(f.path + "?v=bumped2 fetched from a Worker was requested " + hits[f.path] + " time(s): the copied entry did not answer it");
   }
-  // --network files are not this scope's worker's to answer (a Worker whose
-  // script is in another scope imports them from the network): step 2 allows
-  // them, so does this
-  const again = sameFiles.filter((f) => hits[f.path] && !viaOther.includes(f.path));
+  // a --network file's Worker requests (with ?v) are counted apart (see
+  // viaOther); the page's own bare request for it still counts here
+  const again = sameFiles.filter((f) => hits[f.path]);
   if (again.length) fail("the new build asked the server for unchanged files: " + again.map((f) => f.path).join(", "));
   out.reuse = changedPath + " changed: " + sameFiles.length + " unchanged cached file(s) requested 0 times during the update" + (tamperFile ? " (but " + tamperFile.path + ", whose old entry was tampered with: fetched and hash-checked)" : "") + (lazy.length ? ", " + lazy.length + " lazy file(s) copied, 0 requests" : "");
   await browser.close();
