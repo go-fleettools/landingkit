@@ -111,6 +111,9 @@ func Generate(cfg Config) (*Manifest, error) {
 	if strings.Contains(cfg.Name, "|") {
 		return nil, fmt.Errorf("wasmcache: the name %q must not hold a |, which ends a name in Cache Storage", cfg.Name)
 	}
+	if !validName(cfg.Name) {
+		return nil, fmt.Errorf("wasmcache: the name %q must be non-empty and hold only A-Z a-z 0-9 . _ : / - (it is embedded in a generated script)", cfg.Name)
+	}
 	for _, s := range append([]string{cfg.Home}, cfg.Scopes...) {
 		if !strings.HasPrefix(s, "/") || !strings.HasSuffix(s, "/") || strings.Contains(s, "..") {
 			return nil, fmt.Errorf("wasmcache: %q must start and end with a slash and hold no ..", s)
@@ -219,4 +222,22 @@ func matches(pat, rel string) bool {
 	}
 	ok, _ := path.Match(pat, rel)
 	return ok
+}
+
+// validName reports whether a cache name uses only [A-Za-z0-9._:/-]: the name
+// is embedded in a script the worker generates, so no quote, angle bracket or
+// space may reach it.
+func validName(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '.', r == '_', r == ':', r == '/', r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }

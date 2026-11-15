@@ -180,11 +180,19 @@ async function verifiedNetwork(req, p) {
     // constant of this worker (it executes none of the server's bytes): it
     // removes this worker and this playground's caches, and reloads, so the
     // network's page, and its new worker, take over.
-    const name = JSON.stringify(CONFIG.name + "|");
+    // It reloads at most once: the reload carries ?wasmcache-reset=1 (a query
+    // parameter, not sessionStorage, which can throw or be blocked and would
+    // then loop; it is stateless and per navigation). A page that comes back
+    // still failing, with the marker, shows a static message and stops.
+    // "<" is escaped so no name can close the script element.
+    const name = JSON.stringify(CONFIG.name + "|").replace(/</g, "\\u003c");
     return new Response(
-      "<!doctype html><meta charset=utf-8><title>Updating</title><p>Updating…</p><script>" +
-      "(async()=>{try{const r=await navigator.serviceWorker.getRegistration(location.href);if(r)await r.unregister();" +
-      "for(const k of await caches.keys())if(k.startsWith(" + name + "))await caches.delete(k)}catch(e){}location.reload()})()" +
+      "<!doctype html><meta charset=utf-8><title>Updating</title><p id=m>Updating…</p><script>" +
+      "(async()=>{const u=new URL(location.href);if(u.searchParams.get('wasmcache-reset')==='1'){" +
+      "document.getElementById('m').textContent='This page could not be updated automatically. Please clear this site\\'s data (cookies and site data in the browser settings) and reload.';return}" +
+      "try{const r=await navigator.serviceWorker.getRegistration(location.href);if(r)await r.unregister();" +
+      "for(const k of await caches.keys())if(k.startsWith(" + name + "))await caches.delete(k)}catch(e){}" +
+      "u.searchParams.set('wasmcache-reset','1');location.replace(u.href)})()" +
       "</script>",
       { status: 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
   }

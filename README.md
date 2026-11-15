@@ -1035,6 +1035,16 @@ What it does, and what it refuses:
   in a name, so one name is never the prefix of another), and answers only its
   own manifest. Two playgrounds on one `github.io` origin never read, rewrite
   or delete each other's entries; the kit's `--neighbour <page>` asserts it.
+  A name is restricted to `[A-Za-z0-9._:/-]` (it is embedded in a script the
+  worker generates); anything else is refused at generation.
+- **The recovery page reloads at most once.** A navigation whose network copy no
+  longer matches the manifest gets a constant "Updating…" page that removes the
+  worker and this playground's caches and reloads with `?wasmcache-reset=1`
+  (a query parameter rather than `sessionStorage`, which can throw or be
+  blocked and would then loop). If the page still fails with the marker, it
+  shows a static "clear this site's data" message and does not reload again.
+  `wasmcache-client.js` removes the marker from the address bar. The kit makes
+  `unregister` throw and asserts exactly one reload, then the message.
 - A page that carries `?v=<version>` on its URLs (a deploy's commit) gets the
   cached copy only when the version is the worker's: a page of another deploy
   goes to the network.

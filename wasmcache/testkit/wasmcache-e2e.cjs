@@ -64,7 +64,7 @@ for (const a of assets) if (!manifest.files.some((f) => f.path === a)) fail(a + 
 // the server
 // hits is reset between steps; everHits never is: what the server was asked
 // for since it started (the "not fetched before the feature is used" proof)
-let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "";
+let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "", tamperAlways = "";
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
   hits[u.pathname] = (hits[u.pathname] || 0) + 1;
@@ -77,7 +77,7 @@ const server = http.createServer((req, res) => {
   let p = u.pathname.endsWith("/") ? u.pathname + "index.html" : u.pathname;
   let body;
   try { body = fs.readFileSync(path.join(root, path.normalize(p))); } catch (e) { res.writeHead(404); return res.end("no"); }
-  if ((tamper && p === assets[0]) || (tamperOnce && p === tamperOnce)) {
+  if ((tamper && p === assets[0]) || (tamperOnce && p === tamperOnce) || (tamperAlways && p === tamperAlways)) {
     if (p === tamperOnce) tamperOnce = ""; // a newer deploy answers the retry
     body = Buffer.alloc(body.length, 0x78); // same size, other bytes
   } else if (bumped && p.endsWith("/wasmcache.json")) {
@@ -253,6 +253,36 @@ const out = {};
     if (tamperOnce !== "") fail("the tampered page was not requested");
     await page.close();
     out.changedPage = indexPath + " not matching its hash took the update path (worker and caches removed, reload) and came back up, not a 502";
+  }
+
+  // 3b''. the recovery page reloads AT MOST ONCE. Here the page never matches
+  // and unregister() always throws, so the update path cannot succeed: one
+  // reload (marker ?wasmcache-reset=1), then a static "clear site data"
+  // message and no further reload.
+  if (manifest.files.some((f) => f.path === indexPath)) {
+    page = await open();
+    await page.evaluate(async (n, p) => { await (await caches.open(n)).delete(p); }, cacheName(), indexPath);
+    await page.close();
+    page = await ctx.newPage();
+    await page.evaluateOnNewDocument(() => {
+      ServiceWorkerRegistration.prototype.unregister = () => Promise.reject(new Error("unregister always fails"));
+    });
+    tamperAlways = indexPath;
+    hits = {};
+    await page.goto(base + pagePath, { waitUntil: "load" }).catch(() => {});
+    let msg = false;
+    for (let i = 0; i < 80 && !msg; i++) {
+      msg = await page.evaluate(() => /clear/i.test(document.body ? document.body.innerText : "")).catch(() => false);
+      if (!msg && (hits[pagePath] || 0) > 3) break; // looping: stop waiting, the assertion below says so
+      if (!msg) await sleep(100);
+    }
+    await sleep(1500); // a loop would show itself here
+    const n = hits[pagePath] || 0;
+    tamperAlways = "";
+    if (n !== 2) fail("the recovery page requested the page " + n + " times, want exactly 2 (one load, one reload)");
+    if (!msg) fail("the recovery page showed no clear-site-data message after its one reload");
+    await page.close();
+    out.recoveryBound = "when unregistering keeps failing, the recovery page reloads exactly once, then shows a static clear-site-data message";
   }
 
   // 3c. version skew: a page of another deploy (?v=stale) asks for a file

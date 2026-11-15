@@ -114,6 +114,9 @@ func TestGenerateRefusals(t *testing.T) {
 		{"scope with ..", func(c *Config) { c.Scopes = []string{"/a/../b/"} }, "must start and end"},
 		{"bad home", func(c *Config) { c.Home = "x/" }, "must start and end"},
 		{"a name with the separator", func(c *Config) { c.Name = "a|b" }, "must not hold a |"},
+		{"a name closing the script", func(c *Config) { c.Name = "</script><script>alert(1)</script>" }, "must be non-empty and hold only"},
+		{"a name with a quote", func(c *Config) { c.Name = `a"b` }, "must be non-empty and hold only"},
+		{"a name with a space", func(c *Config) { c.Name = "a b" }, "must be non-empty and hold only"},
 		{"bad exclude", func(c *Config) { c.Exclude = []string{"api/"} }, "must start with a slash"},
 		{"asset matches nothing", func(c *Config) { c.Assets = []string{"nope/*.wasm"} }, "matches no file"},
 		{"asset under an excluded prefix", func(c *Config) { c.Assets = []string{"api/"} }, "excluded"},
@@ -124,6 +127,15 @@ func TestGenerateRefusals(t *testing.T) {
 		c.edit(&cfg)
 		if _, err := Generate(cfg); err == nil || !strings.Contains(err.Error(), c.want) {
 			t.Errorf("%s: %v, want %q", c.name, err, c.want)
+		}
+	}
+}
+
+func TestGenerateAcceptsValidNames(t *testing.T) {
+	for _, n := range []string{"pg", "wasmcache:/playground/", "the-other.playground_2", "A/b:c"} {
+		d := site(t)
+		if _, err := Generate(Config{Dir: d, Assets: []string{"playground/*.wasm"}, Scopes: []string{"/playground/"}, Name: n}); err != nil {
+			t.Errorf("name %q refused: %v", n, err)
 		}
 	}
 }
