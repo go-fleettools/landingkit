@@ -286,6 +286,7 @@ const out = {};
     // steps after this one start from the state they expect
     page = await open();
     await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+    await page.evaluate(() => wasmcache.cached()); // the first check has then run, as before the next steps
     const wantIdx = manifest.files.find((f) => f.path === indexPath).sha256;
     for (let i = 0; i < 100 && (await cacheHash(page, indexPath)) !== wantIdx; i++) await sleep(100);
     if ((await cacheHash(page, indexPath)) !== wantIdx) fail(indexPath + " was not restored in the cache after the recovery bound step");
