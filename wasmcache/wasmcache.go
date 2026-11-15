@@ -112,7 +112,7 @@ func Generate(cfg Config) (*Manifest, error) {
 		return nil, fmt.Errorf("wasmcache: the name %q must not hold a |, which ends a name in Cache Storage", cfg.Name)
 	}
 	if !validName(cfg.Name) {
-		return nil, fmt.Errorf("wasmcache: the name %q must be non-empty and hold only A-Z a-z 0-9 . _ : / - (it is embedded in a generated script)", cfg.Name)
+		return nil, fmt.Errorf("wasmcache: the name %q must hold only A-Z a-z 0-9 . _ : / - (it is embedded in a generated script)", cfg.Name)
 	}
 	for _, s := range append([]string{cfg.Home}, cfg.Scopes...) {
 		if !strings.HasPrefix(s, "/") || !strings.HasSuffix(s, "/") || strings.Contains(s, "..") {
@@ -228,9 +228,6 @@ func matches(pat, rel string) bool {
 // is embedded in a script the worker generates, so no quote, angle bracket or
 // space may reach it.
 func validName(s string) bool {
-	if s == "" {
-		return false
-	}
 	for _, r := range s {
 		switch {
 		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
