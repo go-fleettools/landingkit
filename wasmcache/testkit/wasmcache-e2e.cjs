@@ -72,6 +72,19 @@ const changedPath = args.changed || (eagerFiles.find((f) => /\/worker\.js$/.test
 if (!eagerFiles.some((f) => f.path === changedPath)) fail("--changed " + changedPath + " is not a cached file of the manifest");
 const changedBody = Buffer.concat([fs.readFileSync(path.join(root, path.normalize(changedPath))), Buffer.from("\n//wasmcache-kit: a newer build\n")]);
 
+// served: a listed file as build "bumpedN" serves it. A real deploy changes the
+// ?v= its pages carry (the deploy's version, which is also the worker's), so
+// the pages are rewritten from ?v=<manifest.version> to ?v=bumpedN, and from
+// bumped2 on one file (changedPath) differs. The manifest the bumped worker
+// holds lists these bytes' hashes, so a page after the reload asks for
+// ?v=bumpedN like a real next deploy and every request stays counted.
+const served = (p, n) => {
+  let b = fs.readFileSync(path.join(root, path.normalize(p)));
+  if (n >= 2 && p === changedPath) b = changedBody;
+  if (manifest.version && /\.html$/.test(p)) b = Buffer.from(b.toString("utf8").split("?v=" + manifest.version).join("?v=bumped" + n));
+  return b;
+};
+
 // the server
 // hits is reset between steps; everHits never is: what the server was asked
 // for since it started (the "not fetched before the feature is used" proof)
@@ -95,11 +108,10 @@ const server = http.createServer((req, res) => {
     body = Buffer.from(JSON.stringify({ name: manifest.name, build: "bumped" + bumped, version: "bumped" + bumped }));
   } else if (bumped && p === scope + "wasmcache-sw.js") {
     const m = Object.assign({}, manifest, { build: "bumped" + bumped, version: "bumped" + bumped });
-    // from bumped2 on, a build in which ONE file differs (changedPath)
-    if (bumped >= 2) m.files = manifest.files.map((f) => (f.path === changedPath ? Object.assign({}, f, { sha256: sha(changedBody), size: changedBody.length }) : f));
+    m.files = manifest.files.map((f) => { const b = served(f.path, bumped); return Object.assign({}, f, { sha256: sha(b), size: b.length }); });
     body = Buffer.from(swText.replace(CONF[1], JSON.stringify(m)));
-  } else if (bumped >= 2 && p === changedPath) {
-    body = changedBody;
+  } else if (bumped && manifest.files.some((f) => f.path === p)) {
+    body = served(p, bumped);
   }
   const types = { ".html": "text/html", ".js": "text/javascript", ".json": "application/json", ".wasm": "application/wasm", ".css": "text/css" };
   res.writeHead(200, { "content-type": types[path.extname(p)] || "application/octet-stream", "cache-control": "no-cache" });
@@ -429,7 +441,10 @@ const out = {};
     if (!r) return null;
     return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await r.arrayBuffer())), (x) => x.toString(16).padStart(2, "0")).join("");
   }, n, p);
-  const sameFiles = eagerFiles.filter((f) => f.path !== changedPath);
+  // unchanged = the same bytes in build 2 as in the original build: derived from
+  // the bytes, so a page the ?v rewrite changed (and changedPath) drop out, and a
+  // page carrying no ?v stays in and must be requested 0 times
+  const sameFiles = eagerFiles.filter((f) => sha(served(f.path, 2)) === f.sha256);
   const tamperFile = sameFiles.find((f) => f.path === assets[0]) || sameFiles.find((f) => !/\.html$/.test(f.path)) || sameFiles[0];
   // the lazy files build 1 stores (a feature that needed them has used them)
   for (const f of lazy) {
@@ -474,6 +489,14 @@ const out = {};
     const got = await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()).then((b) => b.byteLength), f.path);
     if (got !== f.size) fail(f.path + " came back with " + got + " bytes in the new build");
     if (hits[f.path]) fail(f.path + " cached by the old build was requested " + hits[f.path] + " time(s) in the new one");
+    // the way a deploy's page asks (?v=<its version>), here from a dedicated
+    // Worker like an app's: answered from the copied entry too
+    const viaWorker = await page.evaluate((a) => new Promise((res, rej) => {
+      const w = new Worker(URL.createObjectURL(new Blob(["fetch(" + JSON.stringify(a) + ").then((r)=>r.arrayBuffer()).then((b)=>postMessage(b.byteLength),(e)=>postMessage(-1))"])));
+      w.onmessage = (e) => res(e.data); w.onerror = () => rej(new Error("worker failed"));
+    }), base + f.path + "?v=bumped2");
+    if (viaWorker !== f.size) fail(f.path + "?v=bumped2 fetched from a Worker came back with " + viaWorker + " bytes");
+    if (hits[f.path]) fail(f.path + "?v=bumped2 fetched from a Worker was requested " + hits[f.path] + " time(s): the copied entry did not answer it");
   }
   const again = sameFiles.filter((f) => hits[f.path]);
   if (again.length) fail("the new build asked the server for unchanged files: " + again.map((f) => f.path).join(", "));
