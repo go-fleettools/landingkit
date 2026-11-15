@@ -249,3 +249,33 @@ func TestCheckUsage(t *testing.T) {
 		t.Fatalf("missing dir: exit %d", code)
 	}
 }
+
+// A fact that is the whole of a card's heading or a footer's segment is the strip
+// said twice; the same words inside a sentence that says something else are a
+// mention. The two witnesses are real (testdata/mentions/PROVENANCE.txt).
+func TestCheckMentionsAreNotRepeats(t *testing.T) {
+	femCard := `<div class="card"><div class="ico">⚖️</div><h3>Licences kept clean</h3><p>MFEM (BSD-3-Clause) is the design reference; FEniCS and DOLFINx (LGPL) are oracles only.</p></div>`
+	doomFooter := `<footer><div class="wrap"><span>BSD-3-Clause wrapper &middot; GPL-2.0 engine subtree &middot;
+    <a href="https://github.com/go-doom">github.com/go-doom</a> &middot;
+    pure-Go DOOM, no cgo</span></div></footer>`
+	for name, tc := range map[string]struct {
+		html string
+		code int
+		want string
+	}{
+		"go-fem: a third-party licence in a card": {archPage(femCard), 0, "check:"},
+		"go-doom: a mixed licence in a footer":    {strings.Replace(archPage(""), `<footer>© the authors</footer>`, doomFooter, 1), 0, "check:"},
+		"a card with no heading":                  {archPage(`<div class=card><p>Every repository is BSD-3-Clause.</p></div>`), 0, "check:"},
+		// the repeats that stay refused
+		"a card headed with the licence":    {archPage(`<div class=card><h3>BSD-3-Clause</h3><p>Every repository.</p></div>`), 1, `a feature card repeats "BSD-3-Clause"`},
+		"a footer segment that is the fact": {strings.Replace(archPage(""), `<footer>© the authors</footer>`, `<footer><span>© the authors</span> · <span>BSD-3-Clause</span></footer>`, 1), 1, `footer repeats "BSD-3-Clause"`},
+		"a footer listing facts":            {strings.Replace(archPage(""), `<footer>© the authors</footer>`, `<footer>Pure Go, CGO_ENABLED=0 · no frameworks</footer>`, 1), 1, `footer repeats "CGO_ENABLED=0"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, msg := runCheck(t, checkSite(t, tc.html))
+			if code != tc.code || !strings.Contains(msg, tc.want) {
+				t.Fatalf("exit %d, want %d and %q:\n%s", code, tc.code, tc.want, msg)
+			}
+		})
+	}
+}
