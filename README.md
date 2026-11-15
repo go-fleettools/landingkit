@@ -1086,7 +1086,9 @@ work) and the old cache gone. A last step builds a newer deploy in which one
 file differs (`--changed <path>`, default a `worker.js`) and asserts that every
 unchanged cached file is requested 0 times during the update, that a lazy file
 the old build stored is copied and served with 0 requests, and that a
-tampered old entry is not reused but fetched and hash-checked. This repository runs it on a fixture site.
+tampered old entry is not reused but fetched and hash-checked. A request that
+carries the page's own `?v=` (not the simulated build's) is another deploy's
+by design and goes to the network, so the kit does not count it. This repository runs it on a fixture site.
 
 ## Licence
 

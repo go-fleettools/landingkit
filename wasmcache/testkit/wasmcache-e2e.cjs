@@ -78,7 +78,14 @@ const changedBody = Buffer.concat([fs.readFileSync(path.join(root, path.normaliz
 let hits = {}, everHits = {}, bumped = 0, apiN = 0, tamper = false, tamperOnce = "", tamperAlways = "";
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, "http://x");
-  hits[u.pathname] = (hits[u.pathname] || 0) + 1;
+  // A request that carries ?v=<a deploy that is not the one served now> is a
+  // page of ANOTHER deploy asking for its own files: the worker sends it to the
+  // network by design (step 3c). After a simulated bump the page that is up
+  // still carries the fixture's real ?v, so what it fetches (a lazy file from a
+  // dedicated Worker, say) is that case, not a file the new build failed to
+  // copy: it is not counted in `hits`.
+  const rv = u.searchParams.get("v");
+  if (rv === null || rv === (bumped ? "bumped" + bumped : manifest.version)) hits[u.pathname] = (hits[u.pathname] || 0) + 1;
   everHits[u.pathname] = (everHits[u.pathname] || 0) + 1;
   if (u.pathname.startsWith(apiPrefix)) {
     apiN++;
@@ -474,6 +481,14 @@ const out = {};
     const got = await page.evaluate((a) => fetch(a).then((r) => r.arrayBuffer()).then((b) => b.byteLength), f.path);
     if (got !== f.size) fail(f.path + " came back with " + got + " bytes in the new build");
     if (hits[f.path]) fail(f.path + " cached by the old build was requested " + hits[f.path] + " time(s) in the new one");
+    // the way a deploy's page asks (?v=<its version>), here from a dedicated
+    // Worker like an app's: answered from the copied entry too
+    const viaWorker = await page.evaluate((a) => new Promise((res, rej) => {
+      const w = new Worker(URL.createObjectURL(new Blob(["fetch(" + JSON.stringify(a) + ").then((r)=>r.arrayBuffer()).then((b)=>postMessage(b.byteLength),(e)=>postMessage(-1))"])));
+      w.onmessage = (e) => res(e.data); w.onerror = () => rej(new Error("worker failed"));
+    }), base + f.path + "?v=bumped2");
+    if (viaWorker !== f.size) fail(f.path + "?v=bumped2 fetched from a Worker came back with " + viaWorker + " bytes");
+    if (hits[f.path]) fail(f.path + "?v=bumped2 fetched from a Worker was requested " + hits[f.path] + " time(s): the copied entry did not answer it");
   }
   const again = sameFiles.filter((f) => hits[f.path]);
   if (again.length) fail("the new build asked the server for unchanged files: " + again.map((f) => f.path).join(", "));

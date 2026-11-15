@@ -220,8 +220,11 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 });
 </script>`)
 	put(t, d, "playground/app.wasm", strings.Repeat("0123456789abcdef", 1<<16)) // 1 MiB
-	put(t, d, "playground/worker.js", "self.onmessage = function () {};\n")     // the file a deploy changes alone
+	// the file a deploy changes alone; also the dedicated Worker that fetches the
+	// lazy video file, like a playground's video worker
+	put(t, d, "playground/worker.js", "self.onmessage = function (e) { fetch(e.data).then(function (r) { return r.arrayBuffer(); }).then(function (b) { postMessage(b.byteLength); }); };\n")
 	put(t, d, "playground/fonts/f.ttf", "font bytes")
+	put(t, d, "playground/video.wasm", strings.Repeat("video bytes 0123456789", 1<<14)) // lazy, fetched from the Worker
 	put(t, d, "api/x", "{}")
 	// a second playground on the same origin: its own page, files, name,
 	// scope and worker; the kit checks that neither touches the other's cache
@@ -230,7 +233,22 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	if _, err := Generate(Config{Dir: d, Assets: []string{"b/index.html", "b/app.wasm"}, Scopes: []string{"/b/"}, Name: "the-other-playground"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Generate(Config{Dir: d, Assets: []string{"playground/index.html", "playground/app.wasm", "playground/worker.js"}, Lazy: []string{"playground/fonts/"}, Scopes: []string{"/playground/"}}); err != nil {
+	// The shape of a real playground: the pages carry the deploy as ?v=, a lazy
+	// file is fetched from a dedicated Worker (and again at every load once the
+	// work needs it), and several scopes (one per language) share one name.
+	video := `<script>
+window.useVideo = function () {
+  return new Promise(function (res) {
+    var w = new Worker("/playground/worker.js?v=fixturev1");
+    w.onmessage = function (e) { res(e.data); };
+    w.postMessage("/playground/video.wasm?v=fixturev1");
+  });
+};
+if (localStorage.getItem("wantVideo")) window.useVideo();
+</script>`
+	put(t, d, "playground/index.html", readFile(t, d, "playground/index.html")+video)
+	put(t, d, "fr/playground/index.html", strings.ReplaceAll(readFile(t, d, "playground/index.html"), `lang="en"`, `lang="fr"`))
+	if _, err := Generate(Config{Dir: d, Version: "fixturev1", Assets: []string{"playground/index.html", "playground/app.wasm", "playground/worker.js", "fr/playground/index.html"}, Lazy: []string{"playground/fonts/", "playground/video.wasm"}, Scopes: []string{"/playground/", "/fr/playground/"}}); err != nil {
 		t.Fatal(err)
 	}
 	kit := filepath.Join(t.TempDir(), "wasmcache-e2e.cjs")
@@ -239,7 +257,7 @@ fetch("/playground/app.wasm").then(function (r) { return r.arrayBuffer(); }).the
 	}
 	// the app's own feature, which needs the lazy font: the kit brackets it
 	hooks := filepath.Join(t.TempDir(), "hooks.cjs")
-	if err := os.WriteFile(hooks, []byte(`module.exports = { useFiles: ["/playground/fonts/f.ttf"], async use(page) { await page.evaluate(() => fetch("/playground/fonts/f.ttf").then((r) => r.arrayBuffer())); } };`), 0o644); err != nil {
+	if err := os.WriteFile(hooks, []byte(`module.exports = { useFiles: ["/playground/fonts/f.ttf", "/playground/video.wasm"], async use(page) { await page.evaluate(() => { localStorage.setItem("wantVideo", "1"); return fetch("/playground/fonts/f.ttf").then((r) => r.arrayBuffer()).then(() => window.useVideo()); }); } };`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cmd := exec.Command(node, kit, "--hooks", hooks, "--root", d, "--page", "/playground/", "--asset", "/playground/app.wasm", "--neighbour", "/b/", "--ready", "window.appReady===true")
