@@ -928,6 +928,14 @@ is the pattern of `example/layouts/index.html`:
 {{ if not (partial "mantra-on.html" .) }}BSD-3-Clause · CGO_ENABLED=0{{ end }}
 ```
 
+**A repeat stands alone (landingkit#46).** In a footer or a feature card, a strip
+fact is a repeat only when it is the whole of a *footer segment* (the text between
+middle dots or elements: `BSD-3-Clause`, `Pure Go, CGO_ENABLED=0`) or the whole of
+a *card heading*. The same words inside a sentence that says something else are a
+mention, and pass: `MFEM (BSD-3-Clause) is the design reference` (a third-party
+licence) and `BSD-3-Clause wrapper · GPL-2.0 engine subtree` (a mixed licence).
+The hero's sub-text keeps the substring rule, and so do the tested architectures.
+
 The heading is not checked: "in pure Go" in an `h1` is the project's identity,
 not the strip's fact. Add it to the landing's links workflow, next to
 `landingkit links public`.

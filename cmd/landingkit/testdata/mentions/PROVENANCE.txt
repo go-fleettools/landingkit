@@ -1,0 +1,4 @@
+Real markup, copied verbatim on 2026-11-15 (landingkit#46):
+- go-fem.github.io layouts/index.html line 53 (card): "MFEM (BSD-3-Clause)" is a third-party licence.
+- go-doom.github.io layouts/index.html lines 117-119 (footer): "BSD-3-Clause wrapper · GPL-2.0 engine" is a mixed licence.
+Each failed `landingkit check` under a strip that says LICENSE=BSD-3-Clause.

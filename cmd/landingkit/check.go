@@ -128,9 +128,21 @@ func redundant(page string) []string {
 	} {
 		for _, body := range m {
 			t := strings.ToLower(text(body))
-			for _, fact := range f {
-				if strings.Contains(t, strings.ToLower(fact)) {
-					found = append(found, fmt.Sprintf("%s repeats %q", where[i], fact))
+			// A repeat is the strip's fact STANDING ALONE: a card's heading or a
+			// footer's segment. A phrase inside a sentence that says something
+			// else ("MFEM (BSD-3-Clause) is the design reference", "BSD-3-Clause
+			// wrapper · GPL-2.0 engine") is a mention, not the strip said twice
+			// (landingkit#46). The hero's sub-text keeps the substring rule.
+			switch i {
+			case 0:
+				found = append(found, standaloneFacts(where[i], footerSegments(body), f)...)
+			case 2:
+				found = append(found, standaloneFacts(where[i], []string{text(headingOf(body))}, f)...)
+			default:
+				for _, fact := range f {
+					if strings.Contains(t, strings.ToLower(fact)) {
+						found = append(found, fmt.Sprintf("%s repeats %q", where[i], fact))
+					}
 				}
 			}
 			if a := archRepeats(t, arch); a != nil {
@@ -380,4 +392,73 @@ func cmdCheck(args []string, stdout, stderr io.Writer) int {
 	}
 	fmt.Fprintf(stdout, "check: %d page(s) with the mantra strip, nothing said twice; %d hero call-to-action row(s), rendered by the kit and in its order\n", seen, rows)
 	return 0
+}
+
+var h3RE = regexp.MustCompile(`(?s)<h3\b[^>]*>(.*?)</h3>`)
+
+// headingOf is a card's <h3> markup, or "" when it has none.
+func headingOf(card string) string {
+	if m := h3RE.FindStringSubmatch(card); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+// footerSegments are the pieces of a footer set apart by an element boundary or a
+// middle dot: "BSD-3-Clause · Pure Go" and `<span>BSD-3-Clause</span>` are two
+// and one segment, "BSD-3-Clause wrapper · GPL-2.0 engine" is two.
+func footerSegments(markup string) []string {
+	s := html.UnescapeString(tagRE.ReplaceAllString(markup, "\x00"))
+	s = strings.NewReplacer("\x00", "\x01", "·", "\x01", "|", "\x01").Replace(s)
+	var out []string
+	for _, seg := range strings.Split(s, "\x01") {
+		if seg = strings.TrimSpace(spaceRE.ReplaceAllString(seg, " ")); seg != "" {
+			out = append(out, seg)
+		}
+	}
+	return out
+}
+
+// standaloneFacts reports a segment that is nothing but strip facts (and
+// punctuation, "and", "&"): "BSD-3-Clause", "Pure Go", "Pure Go, CGO_ENABLED=0".
+func standaloneFacts(where string, segs []string, facts []string) []string {
+	var out []string
+	var cw []string
+	for _, fact := range facts {
+		for _, w := range strings.FieldsFunc(strings.ToLower(fact), func(r rune) bool { return r == ':' || r == '=' || r == ' ' || r == ',' }) {
+			cw = append(cw, w)
+		}
+	}
+	chipWords := strings.Join(cw, " ")
+	for _, seg := range segs {
+		rest := strings.ToLower(seg)
+		var hit []string
+		for _, fact := range facts {
+			if lf := strings.ToLower(fact); strings.Contains(rest, lf) {
+				hit = append(hit, fact)
+				rest = strings.ReplaceAll(rest, lf, " ")
+			}
+		}
+		rest = strings.NewReplacer("cgo=0", " ", ",", " ", ".", " ", ";", " ", "&", " ", "-", " ", "—", " ", "–", " ", "/", " ").Replace(rest)
+		// words a heading made of the fact is padded with ("No cgo", "CGO free")
+		left := strings.Fields(rest)
+		kept := left[:0]
+		for _, w := range left {
+			switch w {
+			case "and", "no", "zero", "free", "cgo":
+			default:
+				// a word of the chip's own label ("fonts" of "fonts: OFL-1.1")
+				if !strings.Contains(" "+chipWords+" ", " "+w+" ") {
+					kept = append(kept, w)
+				}
+			}
+		}
+		if len(hit) == 0 || len(kept) != 0 {
+			continue
+		}
+		for _, h := range hit {
+			out = append(out, fmt.Sprintf("%s repeats %q", where, h))
+		}
+	}
+	return out
 }
