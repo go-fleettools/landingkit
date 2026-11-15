@@ -282,6 +282,12 @@ const out = {};
     if (n !== 2) fail("the recovery page requested the page " + n + " times, want exactly 2 (one load, one reload)");
     if (!msg) fail("the recovery page showed no clear-site-data message after its one reload");
     await page.close();
+    // leave the cache whole again (the page was removed from it above), so the
+    // steps after this one start from the state they expect
+    page = await open();
+    await page.waitForFunction("globalThis.wasmcache && wasmcache.state() !== 'off'", { timeout: 90000 });
+    if ((await page.evaluate(() => wasmcache.cached())) !== true) fail("the cache was not whole again after the recovery bound step");
+    await page.close();
     out.recoveryBound = "when unregistering keeps failing, the recovery page reloads exactly once, then shows a static clear-site-data message";
   }
 
