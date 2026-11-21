@@ -34,7 +34,7 @@ module github.com/go-fleettools/landingkit/example-i18n
 // and 1.27.4), read at https://vuln.go.dev/ID/GO-2026-6859.json.
 go 1.27.4
 
-require github.com/go-fleettools/landingkit v0.14.0
+require github.com/go-fleettools/landingkit v0.38.0
 
 // Built against the checkout, as example/ is.
 replace github.com/go-fleettools/landingkit => ../
